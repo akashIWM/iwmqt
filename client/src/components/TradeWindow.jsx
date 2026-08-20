@@ -26,9 +26,10 @@ const handleSubmit = async (e) => {
       
       const data = await response.json();
       if (response.ok) {
-        alert(`Success: ${order.side} order placed for ${order.symbol} (ID: ${data.order.id})`);
-      } else {
-        alert(`Order Failed: ${data.message || 'Unauthorized'}`);
+                alert(`Success: ${order.side} order placed for ${order.symbol} (ID: ${data.order.id})`);
+       } else {
+        // Change this line to show the error message from your backend
+        alert(data.message || 'Order Failed: Check RMS Risk Settings');
       }
     } catch (error) {
       console.error('Failed to place order', error);

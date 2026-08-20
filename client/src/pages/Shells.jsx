@@ -3,6 +3,8 @@ import axios from 'axios';
 import Watchlist from '../components/Watchlist';
 import OrderBook from '../components/OrderBook';
 import TradeWindow from '../components/TradeWindow';
+import NetPositions from '../components/NetPositions';
+import BanScript from '../components/BanScript';
 import { useAuth } from '../auth/AuthContext';
 
 // --- SHARED STYLES FOR ALL SHELLS ---
@@ -304,12 +306,18 @@ export const TraderShell = () => {
                 <button style={layoutStyles.closeBtn} onClick={() => setActivePanel(null)}>✕</button>
               </div>
               <div style={layoutStyles.panelContent}>
-                <p style={{ color: '#627d98', fontSize: '14px' }}>
-                  {activePanel} module will be rendered here.
-                </p>
-                {/* Future Phase 2/3 Components will be conditionally rendered here */}
-            {activePanel === 'TradeWindow' && <TradeWindow />}
-            {activePanel === 'OrderWindow' && <OrderBook />}
+                {/* THIS IS THE LOGIC THAT NEEDS UPDATING */}
+                {activePanel === 'TradeWindow' && <TradeWindow />}
+                {activePanel === 'OrderWindow' && <OrderBook />}
+                {activePanel === 'NetPositions' && <NetPositions />}
+                {activePanel === 'BanScript' && <BanScript />}
+
+                {/* If no match is found, show a fallback message */}
+                {!['TradeWindow', 'OrderWindow', 'NetPositions'].includes(activePanel) && (
+                  <p style={{ color: '#627d98', fontSize: '14px' }}>
+                    {activePanel} module is coming soon.
+                  </p>
+                )}
               </div>
             </>
           )}

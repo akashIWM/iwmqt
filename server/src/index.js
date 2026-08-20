@@ -11,6 +11,8 @@ import authRoutes from './routes/auth.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { initMarketDataSocket } from './services/marketData.service.js';
 import orderRoutes from './routes/order.routes.js';
+import positionRoutes from './routes/position.routes.js';
+import rmsRoutes from './routes/rms.routes.js';
 
 dotenv.config();
 
@@ -25,6 +27,9 @@ app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true, 
 }));
+
+app.use('/api/positions', positionRoutes);
+app.use('/api/rms', rmsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'Platform API is running' });

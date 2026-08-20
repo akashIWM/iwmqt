@@ -1,6 +1,5 @@
 import express from 'express';
 import { query } from '../db/postgres.js'; 
-// 1. Swapped verifyToken to authenticate
 import { authenticate } from '../middleware/auth.middleware.js'; 
 
 const router = express.Router();
@@ -22,14 +21,22 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// 2. Applied authenticate to the route
+// POST /api/orders/place
 router.post('/place', authenticate, async (req, res) => {
   try {
     const { symbol, side, type, quantity, price } = req.body;
-    
-    // In your JWT payload, double-check if your user ID is stored as `id` or `userId`. 
-    // Usually it's `userId` from earlier, but if this errors later, it might just be `req.user.id`.
     const userId = req.user.userId || req.user.id; 
+
+    // --- RMS PRE-TRADE CHECK ---
+    // Check if the symbol is in the banned_scripts table
+    const banCheck = await query('SELECT * FROM banned_scripts WHERE symbol = $1', [symbol]);
+    
+    if (banCheck.rows.length > 0) {
+      return res.status(400).json({ 
+        message: `Order Rejected: ${symbol} is currently BANNED by RMS risk controls. Reason: ${banCheck.rows[0].reason}` 
+      });
+    }
+    // --- END RMS CHECK ---
 
     const newOrder = await query(
       `INSERT INTO orders (user_id, symbol, side, type, quantity, price, status) 
