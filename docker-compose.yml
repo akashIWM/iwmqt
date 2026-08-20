@@ -1,0 +1,30 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: iwmqt_user
+      POSTGRES_PASSWORD: iwmqt_password
+      POSTGRES_DB: iwmqt
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./migrations/postgres:/docker-entrypoint-initdb.d
+      - pgdata:/var/lib/postgresql/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      CLICKHOUSE_DB: iwmqt_events
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ''
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./migrations/clickhouse:/docker-entrypoint-initdb.d
+      - chdata:/var/lib/clickhouse
+
+volumes:
+  pgdata:
+  chdata:
