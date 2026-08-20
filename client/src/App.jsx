@@ -5,6 +5,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 // Authentication Providers and Guards
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
+import AdminPortal from './pages/AdminPortal';
 
 // Public Pages
 import Login from './pages/Login';
@@ -49,6 +50,16 @@ export default function App() {
             } 
           />
           
+          {/* NEW: Admin & RMS Control Portal */}
+          <Route 
+            path="/app/admin" 
+            element={
+              <ProtectedRoute allowedRoles={['RMS_ADMIN', 'SUPER_ADMIN']}>
+                <AdminPortal />
+              </ProtectedRoute>
+            } 
+          />
+          
           <Route 
             path="/app/pm" 
             element={
@@ -77,7 +88,7 @@ export default function App() {
           />
 
           {/* Catch-all 404 Route */}
-          <Route path="*" element={<div style={{ padding: '20px' }}>404 - Page Not Found</div>} />
+          <Route path="*" element={<div style={{ padding: '20px', color: '#fff' }}>404 - Page Not Found</div>} />
         </Routes>
       </Router>
     </AuthProvider>

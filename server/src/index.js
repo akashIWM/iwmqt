@@ -30,6 +30,7 @@ app.use(cors({
 
 app.use('/api/positions', positionRoutes);
 app.use('/api/rms', rmsRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'Platform API is running' });

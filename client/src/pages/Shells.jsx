@@ -6,6 +6,7 @@ import TradeWindow from '../components/TradeWindow';
 import NetPositions from '../components/NetPositions';
 import BanScript from '../components/BanScript';
 import { useAuth } from '../auth/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 // --- SHARED STYLES FOR ALL SHELLS ---
 const styles = {
@@ -109,7 +110,6 @@ const styles = {
     borderRadius: '4px',
     alignSelf: 'flex-start'
   },
-  // Table specific styles added for SuperAdmin
   table: {
     width: '100%',
     backgroundColor: 'white',
@@ -157,24 +157,20 @@ const styles = {
 };
 
 // Reusable Component for Access Modules
-const AccessModule = ({ title, scope }) => (
-  <div style={styles.moduleCard}>
+const AccessModule = ({ title, scope, onClick }) => (
+  <div 
+    style={{ ...styles.moduleCard, cursor: onClick ? 'pointer' : 'default' }}
+    onClick={onClick}
+  >
     <h4 style={styles.moduleTitle}>{title}</h4>
     <span style={styles.moduleScope}>{scope}</span>
   </div>
 );
+
 // --- 1. TRADER SHELL ---
-// --- 1. TRADER SHELL (Dockable Right-Hand Rail Layout) ---
 export const TraderShell = () => {
   const { user, logout } = useAuth();
-  
-  // State to manage which side panel is currently open (null = collapsed)
   const [activePanel, setActivePanel] = useState(null);
-
-  const togglePanel = (panelName) => {
-    // If the same tab is clicked, collapse the panel. Otherwise, open the new one.
-    setActivePanel(current => current === panelName ? null : panelName);
-  };
 
   const tabs = [
     { id: 'TradeWindow', label: 'Trade' },
@@ -186,7 +182,6 @@ export const TraderShell = () => {
     { id: 'LogWindow', label: 'Logs' }
   ];
 
-  // Custom layout styles specifically for the Trader Terminal
   const layoutStyles = {
     wrapper: {
       height: '100vh',
@@ -194,7 +189,7 @@ export const TraderShell = () => {
       flexDirection: 'column',
       background: 'linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%)',
       fontFamily: '"Inter", sans-serif',
-      overflow: 'hidden' // Prevent full page scrolling
+      overflow: 'hidden'
     },
     topNav: {
       background: '#ffffff',
@@ -208,7 +203,7 @@ export const TraderShell = () => {
     mainArea: {
       display: 'flex',
       flex: 1,
-      overflow: 'hidden', // Keep scrolling contained to individual panels
+      overflow: 'hidden'
     },
     workspace: {
       flex: 1,
@@ -243,7 +238,7 @@ export const TraderShell = () => {
     },
     tabRail: {
       width: '60px',
-      backgroundColor: '#102a43', // Deep navy rail
+      backgroundColor: '#102a43',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -252,9 +247,9 @@ export const TraderShell = () => {
       zIndex: 10
     },
     tabButton: (isActive) => ({
-      writingMode: 'vertical-rl', // Flips text vertically!
+      writingMode: 'vertical-rl',
       textOrientation: 'mixed',
-      transform: 'rotate(180deg)', // Ensures it reads top-to-bottom
+      transform: 'rotate(180deg)',
       padding: '16px 8px',
       backgroundColor: isActive ? '#245a9e' : 'transparent',
       color: isActive ? '#ffffff' : '#829ab1',
@@ -278,7 +273,6 @@ export const TraderShell = () => {
 
   return (
     <div style={layoutStyles.wrapper}>
-      {/* 1. TOP NAVBAR */}
       <header style={layoutStyles.topNav}>
         <div>
           <h2 style={styles.brandTitle}>IWM Quant | NSE F&O</h2>
@@ -289,15 +283,11 @@ export const TraderShell = () => {
         <button style={styles.logoutBtn} onClick={logout}>Disconnect</button>
       </header>
 
-      {/* 2. FLEX CONTAINER FOR WORKSPACE, PANEL, & RAIL */}
       <div style={layoutStyles.mainArea}>
-        
-        {/* A. Permanent Workspace (Watchlist) */}
         <div style={layoutStyles.workspace}>
           <Watchlist />
         </div>
 
-        {/* B. Dockable Side Panel */}
         <div style={layoutStyles.sidePanel}>
           {activePanel && (
             <>
@@ -306,14 +296,12 @@ export const TraderShell = () => {
                 <button style={layoutStyles.closeBtn} onClick={() => setActivePanel(null)}>✕</button>
               </div>
               <div style={layoutStyles.panelContent}>
-                {/* THIS IS THE LOGIC THAT NEEDS UPDATING */}
                 {activePanel === 'TradeWindow' && <TradeWindow />}
                 {activePanel === 'OrderWindow' && <OrderBook />}
                 {activePanel === 'NetPositions' && <NetPositions />}
                 {activePanel === 'BanScript' && <BanScript />}
 
-                {/* If no match is found, show a fallback message */}
-                {!['TradeWindow', 'OrderWindow', 'NetPositions'].includes(activePanel) && (
+                {!['TradeWindow', 'OrderWindow', 'NetPositions', 'BanScript'].includes(activePanel) && (
                   <p style={{ color: '#627d98', fontSize: '14px' }}>
                     {activePanel} module is coming soon.
                   </p>
@@ -323,19 +311,17 @@ export const TraderShell = () => {
           )}
         </div>
 
-        {/* C. Right-Hand Tab Rail */}
         <div style={layoutStyles.tabRail}>
           {tabs.map((tab) => (
             <button 
               key={tab.id}
               style={layoutStyles.tabButton(activePanel === tab.id)}
-              onClick={() => togglePanel(tab.id)}
+              onClick={() => setActivePanel(current => current === tab.id ? null : tab.id)}
             >
               {tab.label}
             </button>
           ))}
         </div>
-
       </div>
     </div>
   );
@@ -344,6 +330,7 @@ export const TraderShell = () => {
 // --- 2. RMS ADMIN SHELL ---
 export const RMSAdminShell = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   return (
     <div style={styles.container}>
       <header style={styles.navbar}>
@@ -358,7 +345,7 @@ export const RMSAdminShell = () => {
         <p style={styles.text}>Welcome, <strong>{user.fullName}</strong>. Here are your authorized modules:</p>
         
         <div style={styles.grid}>
-          <AccessModule title="RMS Dashboard (14 Controls)" scope="✔ Edit" />
+          <AccessModule title="RMS Dashboard (14 Controls)" scope="✔ Edit" onClick={() => navigate('/app/admin')} />
           <AccessModule title="User & Role Management" scope="✔ Own Entity" />
           <AccessModule title="Server / OMS Config" scope="✔ Entity Scope" />
           <AccessModule title="Kill Switch" scope="✔ User / Global" />
@@ -403,6 +390,7 @@ export const PMShell = () => {
 // --- 4. COMPANY ACCOUNT SHELL ---
 export const CompanyShell = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   return (
     <div style={styles.container}>
       <header style={styles.navbar}>
@@ -423,7 +411,7 @@ export const CompanyShell = () => {
           <AccessModule title="Audit Log" scope="✔ Entity-wide" />
           <AccessModule title="Order Book & Trade Book" scope="View (Entity)" />
           <AccessModule title="Net Positions" scope="View (Entity)" />
-          <AccessModule title="RMS Dashboard" scope="View-Only" />
+          <AccessModule title="RMS Dashboard" scope="View-Only" onClick={() => navigate('/app/admin')} />
           <AccessModule title="Watchlist & BanScript" scope="View-Only" />
         </div>
       </main>
@@ -434,11 +422,11 @@ export const CompanyShell = () => {
 // --- 5. SUPER ADMIN SHELL ---
 export const SuperAdminShell = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Set default axios configuration for protected routes
   axios.defaults.withCredentials = true;
 
   useEffect(() => {
@@ -498,7 +486,7 @@ export const SuperAdminShell = () => {
           <AccessModule title="Server / OMS Config" scope="✔ Global" />
           <AccessModule title="Kill Switch" scope="✔ Platform-wide" />
           <AccessModule title="Audit Log" scope="✔ Platform-wide" />
-          <AccessModule title="RMS Dashboard" scope="View-Only" />
+          <AccessModule title="RMS Dashboard" scope="View-Only" onClick={() => navigate('/app/admin')} />
         </div>
 
         <hr style={{ margin: '32px 0', border: 'none', borderTop: '1px solid #d9e2ec' }} />
@@ -525,7 +513,7 @@ export const SuperAdminShell = () => {
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr key={u.id} style={{ transition: 'background-color 0.2s', ':hover': { backgroundColor: '#f8f9fa' } }}>
+                  <tr key={u.id} style={{ transition: 'background-color 0.2s' }}>
                     <td style={styles.td}>{u.full_name}</td>
                     <td style={styles.td}><strong>{u.user_id}</strong></td>
                     <td style={styles.td}>{u.email}</td>
