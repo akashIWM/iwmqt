@@ -54,4 +54,26 @@ router.post('/place', authenticate, async (req, res) => {
   }
 });
 
+// PUT /api/orders/:id/cancel - Cancel a pending order
+router.put('/:id/cancel', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId || req.user.id;
+
+    const result = await query(
+      `UPDATE orders SET status = 'CANCELLED' WHERE id = $1 AND user_id = $2 AND status = 'PENDING' RETURNING *`,
+      [id, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Order not found or cannot be cancelled (already executed/cancelled)' });
+    }
+
+    res.status(200).json({ message: 'Order cancelled successfully', order: result.rows[0] });
+  } catch (error) {
+    console.error('Cancel Order Error:', error);
+    res.status(500).json({ message: 'Internal server error cancelling order' });
+  }
+});
+
 export default router;

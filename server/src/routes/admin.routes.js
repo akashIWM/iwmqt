@@ -6,7 +6,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware.js';
 const router = express.Router();
 
 // GET /api/admin/stats - System-wide metrics for Admin Dashboard
-router.get('/stats', authenticate, authorize('ADMIN', 'RMS', 'SUPER_ADMIN'), async (req, res) => {
+router.get('/stats', authenticate, authorize('ADMIN', 'RMS', 'SUPER_ADMIN', 'RMS_ADMIN'), async (req, res) => {
   try {
     const totalOrders = await query('SELECT COUNT(*) FROM orders');
     const totalUsers = await query('SELECT COUNT(*) FROM users');

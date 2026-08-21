@@ -6,6 +6,9 @@ import TradeWindow from '../components/TradeWindow';
 import NetPositions from '../components/NetPositions';
 import BanScript from '../components/BanScript';
 import { useAuth } from '../auth/AuthContext';
+import OpenOrders from '../components/OpenOrders';
+import StrategyPanel from '../components/StrategyPanel';
+import LogWindow from '../components/LogWindow';
 import { useNavigate } from 'react-router-dom';
 
 // --- SHARED STYLES FOR ALL SHELLS ---
@@ -298,8 +301,11 @@ export const TraderShell = () => {
               <div style={layoutStyles.panelContent}>
                 {activePanel === 'TradeWindow' && <TradeWindow />}
                 {activePanel === 'OrderWindow' && <OrderBook />}
+                {activePanel === 'OpenOrders' && <OpenOrders />}
                 {activePanel === 'NetPositions' && <NetPositions />}
                 {activePanel === 'BanScript' && <BanScript />}
+                {activePanel === 'Strategy' && <StrategyPanel />}
+                {activePanel === 'LogWindow' && <LogWindow />}
 
                 {!['TradeWindow', 'OrderWindow', 'NetPositions', 'BanScript'].includes(activePanel) && (
                   <p style={{ color: '#627d98', fontSize: '14px' }}>
