@@ -4,9 +4,13 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { query } from '../db/postgres.js';
 import { logAuthEvent } from '../services/clickhouse/logger.js';
-
-const JWT_SECRET = process.env.JWT_SECRET;
+import { isNonEmptyString, isValidEmail, normalizeEmail } from '../utils/validators.js';
 const MAX_FAILED_ATTEMPTS = 5;
+
+const getJwtSecret = () => {
+  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not configured');
+  return process.env.JWT_SECRET;
+};
 
 const validatePasswordComplexity = (password) => {
   // Minimum 8 characters; must include at least one alphabet, one numeral, and one special character/symbol.
@@ -15,7 +19,9 @@ const validatePasswordComplexity = (password) => {
 };
 
 export const sendOtp = async (req, res) => {
-  const { email } = req.body;
+  const email = typeof req.body.email === 'string' ? normalizeEmail(req.body.email) : '';
+
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'A valid @iwmquant.com email is required.' });
 
   try {
     // 1. Domain Restriction Check
@@ -72,6 +78,10 @@ export const register = async (req, res) => {
   // Added `otp` to the destructured body
   const { fullName, userId, email, password, confirmPassword, companyId, otp } = req.body;
 
+  if (![fullName, userId, email, password, confirmPassword].every((value) => isNonEmptyString(value))) {
+    return res.status(400).json({ error: 'All required fields must be provided' });
+  }
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'A valid @iwmquant.com email is required' });
   if (password !== confirmPassword) return res.status(400).json({ error: 'Passwords do not match' });
   if (!validatePasswordComplexity(password)) return res.status(400).json({ error: 'Password does not meet complexity requirements' });
   
@@ -137,9 +147,13 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    if (user.status === 'LOCKED') {
+    if (['LOCKED', 'SUSPENDED', 'PENDING'].includes(user.status)) {
       await logAuthEvent({ event_type: 'LOGIN_FAILURE', user_id: userId, success: false, ip_address: ip, user_agent: ua, metadata: 'Account locked' });
-      return res.status(403).json({ error: 'Account is locked. Please contact administration.' });
+      return res.status(403).json({ error: `Account is ${user.status.toLowerCase()}. Please contact administration.` });
+    }
+
+    if (user.password_expires_at && new Date(user.password_expires_at) <= new Date()) {
+      return res.status(403).json({ error: 'Password has expired. Please reset it before logging in.' });
     }
 
     const validPassword = await bcrypt.compare(password, user.password_hash);
@@ -163,7 +177,7 @@ export const login = async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, userId: user.user_id, role: user.role, companyId: user.company_id },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '12h' }
     );
 
@@ -192,7 +206,7 @@ export const logout = async (req, res) => {
   const token = req.cookies.token;
   if (token) {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, getJwtSecret());
       await logAuthEvent({ event_type: 'LOGOUT', user_id: decoded.userId, role: decoded.role, company_id: decoded.companyId, success: true, ip_address: req.ip, user_agent: req.headers['user-agent'] });
     } catch (e) { /* Ignore invalid token during logout */ }
   }

@@ -15,7 +15,7 @@ router.get('/', authenticate, async (req, res) => {
          SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) as net_qty,
          AVG(price) as avg_price
        FROM orders 
-       WHERE user_id = $1 
+      WHERE user_id = $1 AND status = 'EXECUTED'
        GROUP BY symbol 
        HAVING SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) <> 0`,
       [userId]

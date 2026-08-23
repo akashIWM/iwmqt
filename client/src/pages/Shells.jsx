@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../api';
 import Watchlist from '../components/Watchlist';
 import OrderBook from '../components/OrderBook';
 import TradeWindow from '../components/TradeWindow';
@@ -433,26 +434,27 @@ export const SuperAdminShell = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  axios.defaults.withCredentials = true;
-
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    let active = true;
+    axios.get(`${API_BASE_URL}/admin/users`)
+      .then((response) => {
+        if (active) setUsers(response.data.users);
+      })
+      .catch(() => {
+        if (active) setError('Failed to load user data. Check permissions or network.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-  const fetchUsers = async () => {
-    try {
-      const response = await axios.get('http://localhost:3000/api/admin/users');
-      setUsers(response.data.users);
-      setLoading(false);
-    } catch (err) {
-      setError('Failed to load user data. Check permissions or network.');
-      setLoading(false);
-    }
-  };
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleRoleChange = async (userId, newRole) => {
     try {
-      await axios.put(`http://localhost:3000/api/admin/users/${userId}/role`, { role: newRole });
+      await axios.put(`${API_BASE_URL}/admin/users/${userId}/role`, { role: newRole });
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update role');
@@ -462,7 +464,7 @@ export const SuperAdminShell = () => {
   const handleStatusToggle = async (userId, currentStatus) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
     try {
-      await axios.put(`http://localhost:3000/api/admin/users/${userId}/status`, { status: newStatus });
+      await axios.put(`${API_BASE_URL}/admin/users/${userId}/status`, { status: newStatus });
       setUsers(users.map(u => u.id === userId ? { ...u, status: newStatus } : u));
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update status');

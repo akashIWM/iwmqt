@@ -1,8 +1,9 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../api';
 
 axios.defaults.withCredentials = true;
-axios.defaults.baseURL = 'http://localhost:3000/api';
+axios.defaults.baseURL = API_BASE_URL;
 
 const AuthContext = createContext();
 
@@ -10,19 +11,20 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchMe = async () => {
+  async function fetchMe() {
     try {
       const { data } = await axios.get('/auth/me');
       setUser(data.user);
-    } catch (err) {
+    } catch {
       setUser(null);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
-    fetchMe();
+    const timer = setTimeout(fetchMe, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const login = async (credentials) => {
@@ -43,4 +45,5 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);

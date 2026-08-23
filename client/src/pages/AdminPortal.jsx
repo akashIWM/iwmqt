@@ -1,10 +1,10 @@
-import React from 'react';
+import { API_BASE_URL } from '../api';
 import AdminDashboard from '../components/AdminDashboard';
 
 export default function AdminPortal() {
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:3000/api/auth/logout', { 
+      await fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
         credentials: 'include' 
       });

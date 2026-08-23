@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../db/postgres.js'; 
 import { authenticate } from '../middleware/auth.middleware.js'; 
+import { validateOrder } from '../utils/validators.js';
 
 const router = express.Router();
 
@@ -26,10 +27,14 @@ router.post('/place', authenticate, async (req, res) => {
   try {
     const { symbol, side, type, quantity, price } = req.body;
     const userId = req.user.userId || req.user.id; 
+    const validationError = validateOrder(req.body);
+
+    if (validationError) return res.status(400).json({ message: validationError });
 
     // --- RMS PRE-TRADE CHECK ---
     // Check if the symbol is in the banned_scripts table
-    const banCheck = await query('SELECT * FROM banned_scripts WHERE symbol = $1', [symbol]);
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    const banCheck = await query('SELECT * FROM banned_scripts WHERE symbol = $1', [normalizedSymbol]);
     
     if (banCheck.rows.length > 0) {
       return res.status(400).json({ 
@@ -41,7 +46,7 @@ router.post('/place', authenticate, async (req, res) => {
     const newOrder = await query(
       `INSERT INTO orders (user_id, symbol, side, type, quantity, price, status) 
        VALUES ($1, $2, $3, $4, $5, $6, 'PENDING') RETURNING *`,
-      [userId, symbol, side, type, quantity, price || null]
+      [userId, normalizedSymbol, side, type, quantity, price || null]
     );
 
     res.status(201).json({ 

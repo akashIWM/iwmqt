@@ -1,20 +1,18 @@
 import http from 'http';
+import 'dotenv/config';
 import { WebSocketServer } from 'ws';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import dotenv from 'dotenv';
 
 // 1. THIS IS NOW UNCOMMENTED
-import authRoutes from './routes/auth.routes.js'; 
+import authRoutes from './routes/auth.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { initMarketDataSocket } from './services/marketData.service.js';
 import orderRoutes from './routes/order.routes.js';
 import positionRoutes from './routes/position.routes.js';
 import rmsRoutes from './routes/rms.routes.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,9 +36,6 @@ app.get('/api/health', (req, res) => {
 
 // 2. THIS IS NOW UNCOMMENTED
 app.use('/api/auth', authRoutes);
-
-// 3. MOUNT THE ADMIN ROUTES
-app.use('/api/admin', adminRoutes);
 
 app.use('/api/orders', orderRoutes);
 

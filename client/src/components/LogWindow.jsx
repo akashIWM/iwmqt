@@ -1,17 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+
+const initialLogs = [
+  { type: 'INFO', text: 'Terminal initialized successfully.' },
+  { type: 'WS', text: 'Connected to market-data WebSocket feed.' },
+  { type: 'RMS', text: 'Pre-Trade risk engine active. Zero circuit breaches.' }
+];
 
 export default function LogWindow() {
-  const [logs, setLogs] = useState([]);
+  const [logs, setLogs] = useState(() => initialLogs.map((log) => ({
+    ...log,
+    time: new Date().toLocaleTimeString()
+  })));
 
   useEffect(() => {
-    // Generate initial startup logs
-    const initialLogs = [
-      { time: new Date().toLocaleTimeString(), type: 'INFO', text: 'Terminal initialized successfully.' },
-      { time: new Date().toLocaleTimeString(), type: 'WS', text: 'Connected to NSE WebSocket feed on ws://localhost:3000' },
-      { time: new Date().toLocaleTimeString(), type: 'RMS', text: 'Pre-Trade risk engine active. Zero circuit breaches.' }
-    ];
-    setLogs(initialLogs);
-
     // Simulate occasional incoming log updates
     const interval = setInterval(() => {
       const newLog = {

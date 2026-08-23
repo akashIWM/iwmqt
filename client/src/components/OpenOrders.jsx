@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { apiFetch } from '../api';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
 
@@ -11,18 +12,15 @@ export default function OpenOrders() {
   const [openOrders, setOpenOrders] = useState([]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     fetchOpenOrders();
     const interval = setInterval(fetchOpenOrders, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchOpenOrders = async () => {
+  async function fetchOpenOrders() {
     try {
-      const response = await fetch('http://localhost:3000/api/orders', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
+      const response = await apiFetch('/orders');
       const data = await response.json();
       if (response.ok) {
         // Filter only pending active orders
@@ -32,13 +30,12 @@ export default function OpenOrders() {
     } catch (err) {
       console.error('Failed to fetch open orders:', err);
     }
-  };
+  }
 
   const cancelOrder = async (orderId) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/orders/${orderId}/cancel`, {
+      const response = await apiFetch(`/orders/${orderId}/cancel`, {
         method: 'PUT',
-        credentials: 'include',
       });
       if (response.ok) {
         fetchOpenOrders();

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { apiFetch } from '../api';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
 
@@ -11,12 +12,13 @@ export default function BanScript() {
   const [banned, setBanned] = useState([]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     fetchBannedScripts();
   }, []);
 
-  const fetchBannedScripts = async () => {
+  async function fetchBannedScripts() {
     try {
-      const response = await fetch('http://localhost:3000/api/rms/banned', {
+      const response = await apiFetch('/rms/banned', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -28,7 +30,7 @@ export default function BanScript() {
     } catch (err) {
       console.error('Failed to fetch banned scripts:', err);
     }
-  };
+  }
 
   const [columnDefs] = useState([
     { field: 'symbol', headerName: 'BANNED SCRIPT', width: 140, cellStyle: { fontWeight: '700', color: '#f87171' } },

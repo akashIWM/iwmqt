@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { apiFetch } from '../api';
 
 export default function TradeWindow() {
   const [order, setOrder] = useState({
@@ -17,10 +18,9 @@ export default function TradeWindow() {
 const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:3000/api/orders/place', {
+      const response = await apiFetch('/orders/place', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // <-- CHANGE 'omit' TO 'include' HERE!
         body: JSON.stringify(order)
       });
       

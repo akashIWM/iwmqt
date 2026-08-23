@@ -16,7 +16,7 @@ router.get('/banned', authenticate, async (req, res) => {
 });
 
 // POST /api/rms/ban - RMS Admin can ban a script
-router.post('/ban', authenticate, authorize('ADMIN', 'RMS'), async (req, res) => {
+router.post('/ban', authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { symbol, reason } = req.body;
     const result = await query(
@@ -31,7 +31,7 @@ router.post('/ban', authenticate, authorize('ADMIN', 'RMS'), async (req, res) =>
 });
 
 // DELETE /api/rms/unban/:symbol - Unban a script
-router.delete('/unban/:symbol', authenticate, authorize('ADMIN', 'RMS'), async (req, res) => {
+router.delete('/unban/:symbol', authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
   try {
     const { symbol } = req.params;
     await query('DELETE FROM banned_scripts WHERE symbol = $1', [symbol]);

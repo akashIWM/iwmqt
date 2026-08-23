@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { apiFetch } from '../api';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
 
@@ -11,18 +12,15 @@ export default function NetPositions() {
   const [positions, setPositions] = useState([]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     fetchPositions();
     const interval = setInterval(fetchPositions, 3000);
     return () => clearInterval(interval);
   }, []);
 
- const fetchPositions = async () => {
+ async function fetchPositions() {
     try {
-      const response = await fetch('http://localhost:3000/api/positions', { // Updated route path!
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
+      const response = await apiFetch('/positions');
       const data = await response.json();
       if (response.ok) {
         setPositions(data.positions);
@@ -30,7 +28,7 @@ export default function NetPositions() {
     } catch (err) {
       console.error('Failed to fetch positions:', err);
     }
-  };
+  }
 
   const [columnDefs] = useState([
     { field: 'symbol', headerName: 'INSTRUMENT', width: 140, cellStyle: { fontWeight: '700', color: '#f8fafc' } },

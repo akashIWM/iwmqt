@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { WS_BASE_URL } from '../api';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
 
@@ -14,7 +15,7 @@ export default function Watchlist() {
 
 useEffect(() => {
     let isMounted = true; // Guard flag
-    const ws = new WebSocket('ws://localhost:3000/ws/market-data');
+    const ws = new WebSocket(`${WS_BASE_URL}/ws/market-data`);
 
     ws.onopen = () => {
       if (isMounted) setConnected(true);

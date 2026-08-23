@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { apiFetch } from '../api';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ totalOrders: 0, totalUsers: 0, bannedScriptsCount: 0 });
@@ -10,13 +11,9 @@ export default function AdminDashboard() {
     fetchAdminStats();
   }, []);
 
-  const fetchAdminStats = async () => {
+  async function fetchAdminStats() {
     try {
-      const response = await fetch('http://localhost:3000/api/admin/stats', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
+      const response = await apiFetch('/admin/stats');
       const data = await response.json();
       if (response.ok) {
         setStats(data.stats);
@@ -24,17 +21,16 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error('Failed to load admin stats:', err);
     }
-  };
+  }
 
   const handleBanScript = async (e) => {
     e.preventDefault();
     if (!symbolToBan) return;
 
     try {
-      const response = await fetch('http://localhost:3000/api/rms/ban', {
+      const response = await apiFetch('/rms/ban', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ symbol: symbolToBan.toUpperCase(), reason })
       });
       const data = await response.json();
@@ -80,7 +76,7 @@ export default function AdminDashboard() {
         </div>
         <div style={styles.card}>
           <div style={styles.cardTitle}>ACTIVE BANNED SCRIPTS</div>
-          <div style={styles.cardValue} style={{ color: '#f87171' }}>{stats.bannedScriptsCount}</div>
+          <div style={{ ...styles.cardValue, color: '#f87171' }}>{stats.bannedScriptsCount}</div>
         </div>
       </div>
 

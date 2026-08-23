@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { apiFetch } from '../api';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
 
@@ -9,22 +10,19 @@ import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 export default function OrderBook() {
   const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     fetchOrders();
     // Poll every 3 seconds to keep order status updated
     const interval = setInterval(fetchOrders, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchOrders = async () => {
+  async function fetchOrders() {
     try {
-      const response = await fetch('http://localhost:3000/api/orders', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
+      const response = await apiFetch('/orders');
       const data = await response.json();
       if (response.ok) {
         setOrders(data.orders);
@@ -34,7 +32,7 @@ export default function OrderBook() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   // Fixed widths to fit the 400px side panel cleanly without horizontal scrollbars
   const [columnDefs] = useState([
