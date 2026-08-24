@@ -9,6 +9,7 @@ const INITIAL_INSTRUMENTS = [
 ];
 
 let marketState = [...INITIAL_INSTRUMENTS];
+let seq = 0;
 
 // Reference price for pre-trade band checks (order.routes.js). Returns null if the
 // symbol isn't in the mock market universe - callers should skip the check in that case.
@@ -17,35 +18,50 @@ export const getLtp = (symbol) => {
   return instrument ? instrument.ltp : null;
 };
 
+const tickInstrument = (inst) => {
+  const volatility = inst.ltp * 0.0015; // 0.15% max tick delta
+  const change = (Math.random() - 0.49) * volatility;
+  const newLtp = parseFloat((inst.ltp + change).toFixed(2));
+  const priceDiff = newLtp - inst.prevClose;
+  const pChange = parseFloat(((priceDiff / inst.prevClose) * 100).toFixed(2));
+
+  return {
+    ...inst,
+    ltp: newLtp,
+    change: parseFloat(priceDiff.toFixed(2)),
+    pChange,
+    high: Math.max(inst.high, newLtp),
+    low: Math.min(inst.low, newLtp),
+    bid: parseFloat((newLtp - 0.15).toFixed(2)),
+    ask: parseFloat((newLtp + 0.15).toFixed(2)),
+    volume: inst.volume + Math.floor(Math.random() * 250)
+  };
+};
+
+const snapshotPayload = () => JSON.stringify({ type: 'INITIAL_SNAPSHOT', seq, data: marketState });
+
 export const initMarketDataSocket = (wss) => {
   console.log('📡 Market Data WebSocket Server initialized');
 
-  // Broadcast state changes every 600ms
+  // Broadcast state changes every 600ms - only the instruments that actually ticked,
+  // and only if something did. seq only advances on an actual broadcast, so a gap in
+  // seq observed by a client reliably means a dropped message, never a quiet tick.
   setInterval(() => {
     if (wss.clients.size === 0) return;
 
-    // Simulate realistic micro-ticks for active instruments
+    // Simulate realistic market sparsity - not every instrument moves every tick.
+    const changes = [];
     marketState = marketState.map((inst) => {
-      const volatility = inst.ltp * 0.0015; // 0.15% max tick delta
-      const change = (Math.random() - 0.49) * volatility;
-      const newLtp = parseFloat((inst.ltp + change).toFixed(2));
-      const priceDiff = newLtp - inst.prevClose;
-      const pChange = parseFloat(((priceDiff / inst.prevClose) * 100).toFixed(2));
-
-      return {
-        ...inst,
-        ltp: newLtp,
-        change: parseFloat(priceDiff.toFixed(2)),
-        pChange,
-        high: Math.max(inst.high, newLtp),
-        low: Math.min(inst.low, newLtp),
-        bid: parseFloat((newLtp - 0.15).toFixed(2)),
-        ask: parseFloat((newLtp + 0.15).toFixed(2)),
-        volume: inst.volume + Math.floor(Math.random() * 250)
-      };
+      if (Math.random() > 0.6) return inst;
+      const updated = tickInstrument(inst);
+      changes.push(updated);
+      return updated;
     });
 
-    const payload = JSON.stringify({ type: 'MARKET_TICK', data: marketState });
+    if (changes.length === 0) return;
+    seq += 1;
+
+    const payload = JSON.stringify({ type: 'MARKET_DELTA', seq, changes });
 
     wss.clients.forEach((client) => {
       if (client.readyState === 1) { // WebSocket.OPEN
@@ -56,6 +72,17 @@ export const initMarketDataSocket = (wss) => {
 
   wss.on('connection', (ws) => {
     // Send immediate snapshot on initial connect
-    ws.send(JSON.stringify({ type: 'INITIAL_SNAPSHOT', data: marketState }));
+    ws.send(snapshotPayload());
+
+    ws.on('message', (raw) => {
+      try {
+        const message = JSON.parse(raw);
+        if (message.type === 'RESYNC_REQUEST') {
+          ws.send(snapshotPayload());
+        }
+      } catch (error) {
+        console.error('Market Data WS - malformed client message:', error.message);
+      }
+    });
   });
 };
