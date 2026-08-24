@@ -10,6 +10,7 @@ import { useAuth } from '../auth/AuthContext';
 import OpenOrders from '../components/OpenOrders';
 import StrategyPanel from '../components/StrategyPanel';
 import LogWindow from '../components/LogWindow';
+import RmsStatsSummary from '../components/admin/RmsStatsSummary';
 import { useNavigate } from 'react-router-dom';
 
 // --- SHARED STYLES FOR ALL SHELLS ---
@@ -355,6 +356,7 @@ export const RMSAdminShell = () => {
           <AccessModule title="RMS Dashboard (14 Controls)" scope="✔ Edit" onClick={() => navigate('/app/admin')} />
           <AccessModule title="User & Role Management" scope="✔ Own Entity" onClick={() => navigate('/app/admin?tab=users')} />
           <AccessModule title="Server / OMS Config" scope="✔ Entity Scope" onClick={() => navigate('/app/admin?tab=oms-config')} />
+          <AccessModule title="Security-Wise Limits" scope="✔ Entity Scope" onClick={() => navigate('/app/admin?tab=security-limits')} />
           <AccessModule title="Kill Switch" scope="✔ User / Global" onClick={() => navigate('/app/admin?tab=kill-switch')} />
           <AccessModule title="Audit Log" scope="✔ Entity-wide" onClick={() => navigate('/app/admin?tab=audit-log')} />
           <AccessModule title="Order Book & Trade Book" scope="View (Entity)" onClick={() => navigate('/app/admin?tab=orders')} />
@@ -367,8 +369,20 @@ export const RMSAdminShell = () => {
 };
 
 // --- 3. PM (PORTFOLIO MANAGER) SHELL ---
+// PM is view-only/approval-routing per spec (no order entry, no RMS-limit edit rights), so
+// its modules render inline here rather than routing into the RMS Admin edit-capable portal.
 export const PMShell = () => {
   const { user, logout } = useAuth();
+  const [activeModule, setActiveModule] = useState(null);
+
+  const modules = {
+    positions: { label: 'Net Positions (Aggregated)', render: () => <NetPositions /> },
+    orders: { label: 'Order Book & Trade Book', render: () => <OrderBook /> },
+    rms: { label: 'RMS Dashboard (View-Only)', render: () => <RmsStatsSummary /> },
+    watchlist: { label: 'Watchlist', render: () => <Watchlist /> },
+    banscript: { label: 'BanScript Alerts', render: () => <BanScript /> }
+  };
+
   return (
     <div style={styles.container}>
       <header style={styles.navbar}>
@@ -381,14 +395,22 @@ export const PMShell = () => {
       <main style={styles.contentCard}>
         <h3 style={styles.pageTitle}>Portfolio Management</h3>
         <p style={styles.text}>Welcome, <strong>{user.fullName}</strong>. Here are your authorized modules:</p>
-        
+
         <div style={styles.grid}>
-          <AccessModule title="Net Positions" scope="✔ Aggregated (Desk)" />
-          <AccessModule title="Order Book & Trade Book" scope="View (Desk)" />
-          <AccessModule title="RMS Dashboard" scope="View-Only (Own Desk)" />
-          <AccessModule title="Watchlist" scope="View-Only" />
-          <AccessModule title="BanScript Alerts" scope="View-Only" />
+          <AccessModule title="Net Positions" scope="✔ Aggregated (Desk)" onClick={() => setActiveModule('positions')} />
+          <AccessModule title="Order Book & Trade Book" scope="View (Desk)" onClick={() => setActiveModule('orders')} />
+          <AccessModule title="RMS Dashboard" scope="View-Only (Own Desk)" onClick={() => setActiveModule('rms')} />
+          <AccessModule title="Watchlist" scope="View-Only" onClick={() => setActiveModule('watchlist')} />
+          <AccessModule title="BanScript Alerts" scope="View-Only" onClick={() => setActiveModule('banscript')} />
         </div>
+
+        {activeModule && (
+          <div style={{ marginTop: '24px' }}>
+            <hr style={{ margin: '0 0 24px 0', border: 'none', borderTop: '1px solid #d9e2ec' }} />
+            <h3 style={styles.pageTitle}>{modules[activeModule].label}</h3>
+            {modules[activeModule].render()}
+          </div>
+        )}
       </main>
     </div>
   );
@@ -412,14 +434,15 @@ export const CompanyShell = () => {
         <p style={styles.text}>Welcome, <strong>{user.fullName}</strong>. Here are your authorized modules:</p>
         
         <div style={styles.grid}>
-          <AccessModule title="User & Role Management" scope="✔ Own Entity" />
-          <AccessModule title="Server / OMS Config" scope="✔ Entity Scope" />
-          <AccessModule title="Kill Switch" scope="✔ Entity-wide" />
-          <AccessModule title="Audit Log" scope="✔ Entity-wide" />
-          <AccessModule title="Order Book & Trade Book" scope="View (Entity)" />
-          <AccessModule title="Net Positions" scope="View (Entity)" />
+          <AccessModule title="User & Role Management" scope="✔ Own Entity" onClick={() => navigate('/app/admin?tab=users')} />
+          <AccessModule title="Server / OMS Config" scope="✔ Entity Scope" onClick={() => navigate('/app/admin?tab=oms-config')} />
+          <AccessModule title="Security-Wise Limits" scope="✔ Entity Scope" onClick={() => navigate('/app/admin?tab=security-limits')} />
+          <AccessModule title="Kill Switch" scope="✔ Entity-wide" onClick={() => navigate('/app/admin?tab=kill-switch')} />
+          <AccessModule title="Audit Log" scope="✔ Entity-wide" onClick={() => navigate('/app/admin?tab=audit-log')} />
+          <AccessModule title="Order Book & Trade Book" scope="View (Entity)" onClick={() => navigate('/app/admin?tab=orders')} />
+          <AccessModule title="Net Positions" scope="View (Entity)" onClick={() => navigate('/app/admin?tab=positions')} />
           <AccessModule title="RMS Dashboard" scope="View-Only" onClick={() => navigate('/app/admin')} />
-          <AccessModule title="Watchlist & BanScript" scope="View-Only" />
+          <AccessModule title="Watchlist & BanScript" scope="View-Only" onClick={() => navigate('/app/admin?tab=watchlist')} />
         </div>
       </main>
     </div>
@@ -489,11 +512,12 @@ export const SuperAdminShell = () => {
         
         {/* Module Summary Grid */}
         <div style={styles.grid}>
-          <AccessModule title="Company Account Management" scope="✔ Full Access" />
-          <AccessModule title="User & Role Management" scope="✔ Global" />
-          <AccessModule title="Server / OMS Config" scope="✔ Global" />
-          <AccessModule title="Kill Switch" scope="✔ Platform-wide" />
-          <AccessModule title="Audit Log" scope="✔ Platform-wide" />
+          <AccessModule title="Company Account Management" scope="✔ Full Access" onClick={() => navigate('/app/admin?tab=company-accounts')} />
+          <AccessModule title="User & Role Management" scope="✔ Global" onClick={() => navigate('/app/admin?tab=users')} />
+          <AccessModule title="Server / OMS Config" scope="✔ Global" onClick={() => navigate('/app/admin?tab=oms-config')} />
+          <AccessModule title="Security-Wise Limits" scope="✔ Global" onClick={() => navigate('/app/admin?tab=security-limits')} />
+          <AccessModule title="Kill Switch" scope="✔ Platform-wide" onClick={() => navigate('/app/admin?tab=kill-switch')} />
+          <AccessModule title="Audit Log" scope="✔ Platform-wide" onClick={() => navigate('/app/admin?tab=audit-log')} />
           <AccessModule title="RMS Dashboard" scope="View-Only" onClick={() => navigate('/app/admin')} />
         </div>
 

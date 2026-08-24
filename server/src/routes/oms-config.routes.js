@@ -5,7 +5,7 @@ import { logAudit } from '../utils/audit.js';
 
 const router = express.Router();
 
-router.use(authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN'));
+router.use(authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN', 'COMPANY_ACCOUNT'));
 
 // GET /api/oms-config - current risk limits
 router.get('/', async (req, res) => {
@@ -18,30 +18,44 @@ router.get('/', async (req, res) => {
   }
 });
 
-// PUT /api/oms-config - update risk limits
+// Field name (request body / DB column) -> validation label. All must be positive numbers.
+const NUMERIC_FIELDS = [
+  'max_order_quantity',
+  'max_order_value',
+  'price_band_pct',
+  'max_open_order_value',
+  'max_position_qty',
+  'max_exposure_value',
+  'global_exposure_value',
+  'max_turnover_value',
+  'max_open_orders_count',
+  'max_orders_per_second'
+];
+
+// PUT /api/oms-config - update risk limits (all 14-control global defaults live here)
 router.put('/', async (req, res) => {
   try {
-    const maxOrderQuantity = Number(req.body.max_order_quantity);
-    const maxOrderValue = Number(req.body.max_order_value);
-
-    if (!Number.isFinite(maxOrderQuantity) || maxOrderQuantity <= 0) {
-      return res.status(400).json({ message: 'max_order_quantity must be a positive number' });
+    const values = {};
+    for (const field of NUMERIC_FIELDS) {
+      const value = Number(req.body[field]);
+      if (!Number.isFinite(value) || value <= 0) {
+        return res.status(400).json({ message: `${field} must be a positive number` });
+      }
+      values[field] = value;
     }
-    if (!Number.isFinite(maxOrderValue) || maxOrderValue <= 0) {
-      return res.status(400).json({ message: 'max_order_value must be a positive number' });
-    }
 
+    const setClause = NUMERIC_FIELDS.map((field, i) => `${field} = $${i + 1}`).join(', ');
     const result = await query(
-      `UPDATE oms_config SET max_order_quantity = $1, max_order_value = $2, updated_by = $3, updated_at = NOW()
+      `UPDATE oms_config SET ${setClause}, updated_by = $${NUMERIC_FIELDS.length + 1}, updated_at = NOW()
        WHERE id = 1 RETURNING *`,
-      [maxOrderQuantity, maxOrderValue, req.user.userId]
+      [...NUMERIC_FIELDS.map((field) => values[field]), req.user.userId]
     );
 
     await logAudit(
       req.user.userId,
       'OMS_CONFIG_UPDATE',
       'oms_config',
-      `max_order_quantity=${maxOrderQuantity}, max_order_value=${maxOrderValue}`
+      NUMERIC_FIELDS.map((field) => `${field}=${values[field]}`).join(', ')
     );
 
     res.status(200).json({ message: 'OMS configuration updated', config: result.rows[0] });

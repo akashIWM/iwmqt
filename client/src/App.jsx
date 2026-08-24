@@ -50,13 +50,13 @@ export default function App() {
           />
           
           {/* NEW: Admin & RMS Control Portal */}
-          <Route 
-            path="/app/admin" 
+          <Route
+            path="/app/admin"
             element={
-              <ProtectedRoute allowedRoles={['RMS_ADMIN', 'SUPER_ADMIN']}>
+              <ProtectedRoute allowedRoles={['RMS_ADMIN', 'SUPER_ADMIN', 'COMPANY_ACCOUNT']}>
                 <AdminPortal />
               </ProtectedRoute>
-            } 
+            }
           />
           
           <Route 

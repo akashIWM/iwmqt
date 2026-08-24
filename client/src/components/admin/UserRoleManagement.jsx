@@ -1,9 +1,19 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../api';
+import { useAuth } from '../../auth/AuthContext';
+
+const ALL_ROLES = [
+  { value: 'TRADER', label: 'Trader' },
+  { value: 'PM', label: 'Portfolio Manager' },
+  { value: 'RMS_ADMIN', label: 'RMS Admin' },
+  { value: 'COMPANY_ACCOUNT', label: 'Company Account' },
+  { value: 'SUPER_ADMIN', label: 'Super Admin' }
+];
+const COMPANY_ACCOUNT_CREATABLE_ROLES = ALL_ROLES.filter((r) => ['RMS_ADMIN', 'PM', 'TRADER'].includes(r.value));
 
 const styles = {
-  card: { backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px', border: '1px solid #334155' },
+  card: { backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px', border: '1px solid #334155', marginBottom: '20px' },
   text: { color: '#94a3b8', fontSize: '13px', marginBottom: '16px' },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', padding: '10px 12px', fontSize: '12px', color: '#94a3b8', borderBottom: '1px solid #334155' },
@@ -14,22 +24,49 @@ const styles = {
     padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700',
     backgroundColor: active ? 'rgba(74, 222, 128, 0.15)' : 'rgba(248, 113, 113, 0.15)',
     color: active ? '#4ade80' : '#f87171'
-  })
+  }),
+  input: { padding: '8px 10px', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#fff' },
+  row: { display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' },
+  btn: { padding: '8px 16px', backgroundColor: '#38bdf8', color: '#0f172a', border: 'none', borderRadius: '4px', fontWeight: '700', cursor: 'pointer' },
+  tempPassword: { backgroundColor: '#052e16', border: '1px solid #16a34a', color: '#4ade80', padding: '12px', borderRadius: '6px', fontSize: '13px', marginBottom: '16px', fontFamily: 'monospace' }
 };
 
 export default function UserRoleManagement() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [newUser, setNewUser] = useState({ userId: '', fullName: '', email: '', role: 'TRADER' });
+  const [createError, setCreateError] = useState('');
+  const [createResult, setCreateResult] = useState(null);
+
+  const creatableRoles = currentUser.role === 'COMPANY_ACCOUNT' ? COMPANY_ACCOUNT_CREATABLE_ROLES : ALL_ROLES;
 
   useEffect(() => {
-    let active = true;
-    axios.get(`${API_BASE_URL}/admin/users`)
-      .then((response) => { if (active) setUsers(response.data.users); })
-      .catch(() => { if (active) setError('Failed to load user data. Check permissions or network.'); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    loadUsers();
   }, []);
+
+  function loadUsers() {
+    setLoading(true);
+    axios.get(`${API_BASE_URL}/admin/users`)
+      .then((response) => setUsers(response.data.users))
+      .catch(() => setError('Failed to load user data. Check permissions or network.'))
+      .finally(() => setLoading(false));
+  }
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setCreateError('');
+    setCreateResult(null);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/admin/users`, newUser);
+      setCreateResult(response.data);
+      setNewUser({ userId: '', fullName: '', email: '', role: creatableRoles[0].value });
+      loadUsers();
+    } catch (err) {
+      setCreateError(err.response?.data?.error || 'Failed to create user');
+    }
+  };
 
   const handleRoleChange = async (userId, newRole) => {
     try {
@@ -50,12 +87,31 @@ export default function UserRoleManagement() {
     }
   };
 
-  if (loading) return <p style={styles.text}>Loading user data...</p>;
-  if (error) return <p style={{ ...styles.text, color: '#f87171' }}>{error}</p>;
-
   return (
-    <div style={styles.card}>
+    <div>
+      <div style={styles.card}>
+        <h3 style={{ marginTop: 0 }}>Add User</h3>
+        {createError && <p style={{ color: '#f87171', fontSize: '13px' }}>{createError}</p>}
+        {createResult && (
+          <div style={styles.tempPassword}>
+            Login <strong>{createResult.user.user_id}</strong> created. One-time temp password: <strong>{createResult.tempPassword}</strong>
+            <br />Share this securely - it will not be shown again.
+          </div>
+        )}
+        <form onSubmit={handleCreate} style={styles.row}>
+          <input style={styles.input} placeholder="User ID" value={newUser.userId} onChange={(e) => setNewUser({ ...newUser, userId: e.target.value })} required />
+          <input style={styles.input} placeholder="Full Name" value={newUser.fullName} onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })} required />
+          <input type="email" style={styles.input} placeholder="Email (@iwmquant.com)" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} required />
+          <select style={styles.select} value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}>
+            {creatableRoles.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+          <button type="submit" style={styles.btn}>Add User</button>
+        </form>
+      </div>
+
+      <div style={styles.card}>
       <p style={styles.text}>Assign roles and lock/unlock accounts for every registered user.</p>
+      {loading ? <p style={styles.text}>Loading user data...</p> : error ? <p style={{ ...styles.text, color: '#f87171' }}>{error}</p> : (
       <div style={{ overflowX: 'auto' }}>
         <table style={styles.table}>
           <thead>
@@ -98,6 +154,8 @@ export default function UserRoleManagement() {
             ))}
           </tbody>
         </table>
+      </div>
+      )}
       </div>
     </div>
   );

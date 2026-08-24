@@ -1,16 +1,67 @@
+import bcrypt from 'bcrypt';
 import { query } from '../db/postgres.js';
 import { logAudit } from '../utils/audit.js';
+import { generateTempPassword } from '../utils/password.js';
+import { isNonEmptyString, isValidEmail } from '../utils/validators.js';
 
-// 1. Fetch all registered users
+// 1. Fetch all registered users - Company Account only sees its own entity
 export const getAllUsers = async (req, res) => {
   try {
-    const result = await query(
-      'SELECT id, user_id, full_name, email, role, company_id, status, created_at FROM users ORDER BY created_at DESC'
-    );
+    const result = req.user.role === 'COMPANY_ACCOUNT'
+      ? await query(
+          'SELECT id, user_id, full_name, email, role, company_id, status, created_at FROM users WHERE company_id = $1 ORDER BY created_at DESC',
+          [req.user.companyId]
+        )
+      : await query(
+          'SELECT id, user_id, full_name, email, role, company_id, status, created_at FROM users ORDER BY created_at DESC'
+        );
     res.status(200).json({ users: result.rows });
   } catch (error) {
     console.error("Error fetching users:", error);
     res.status(500).json({ error: 'Failed to fetch users data.' });
+  }
+};
+
+// Creation rights: Super Admin can create any role/company; Company Account can only
+// create RMS_ADMIN/PM/TRADER, always pinned to its own company_id.
+const CREATABLE_ROLES_BY_COMPANY_ACCOUNT = ['RMS_ADMIN', 'PM', 'TRADER'];
+
+export const createUser = async (req, res) => {
+  const { userId, fullName, email, role } = req.body;
+
+  if (!isNonEmptyString(userId, 50)) return res.status(400).json({ error: 'User ID is required.' });
+  if (!isNonEmptyString(fullName, 100)) return res.status(400).json({ error: 'Full name is required.' });
+  if (!isValidEmail(email)) return res.status(400).json({ error: 'A valid @iwmquant.com email is required.' });
+
+  const validRoles = ['TRADER', 'RMS_ADMIN', 'PM', 'COMPANY_ACCOUNT', 'SUPER_ADMIN'];
+  if (!validRoles.includes(role)) return res.status(400).json({ error: 'Invalid role provided.' });
+
+  let companyId = req.body.companyId || null;
+
+  if (req.user.role === 'COMPANY_ACCOUNT') {
+    if (!CREATABLE_ROLES_BY_COMPANY_ACCOUNT.includes(role)) {
+      return res.status(403).json({ error: 'Company Accounts can only create RMS Admin, PM, or Trader logins.' });
+    }
+    companyId = req.user.companyId;
+  }
+
+  try {
+    const tempPassword = generateTempPassword();
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+    const result = await query(
+      `INSERT INTO users (user_id, full_name, email, password_hash, role, company_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, user_id, full_name, email, role, company_id, status`,
+      [userId, fullName, email, passwordHash, role, companyId]
+    );
+
+    await logAudit(req.user.userId, 'USER_CREATED', userId, `role: ${role}`);
+    res.status(201).json({ message: 'User created successfully', user: result.rows[0], tempPassword });
+  } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'User ID or email already exists.' });
+    console.error('Create User Error:', error);
+    res.status(500).json({ error: 'Failed to create user.' });
   }
 };
 
@@ -24,9 +75,9 @@ export const updateUserRole = async (req, res) => {
     return res.status(400).json({ error: 'Invalid role provided.' });
   }
 
-  // RMS Admins manage their own scope only - they cannot grant or touch SUPER_ADMIN.
-  if (req.user.role === 'RMS_ADMIN' && role === 'SUPER_ADMIN') {
-    return res.status(403).json({ error: 'RMS Admins cannot grant the Super Admin role.' });
+  // Only a Super Admin can grant the Super Admin role.
+  if (req.user.role !== 'SUPER_ADMIN' && role === 'SUPER_ADMIN') {
+    return res.status(403).json({ error: 'Only a Super Admin can grant the Super Admin role.' });
   }
 
   try {

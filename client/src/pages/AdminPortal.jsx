@@ -1,10 +1,13 @@
 import { useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../api';
+import { useAuth } from '../auth/AuthContext';
 import AdminDashboard from '../components/AdminDashboard';
 import UserRoleManagement from '../components/admin/UserRoleManagement';
 import OmsConfigPanel from '../components/admin/OmsConfigPanel';
 import KillSwitchPanel from '../components/admin/KillSwitchPanel';
 import AuditLogPanel from '../components/admin/AuditLogPanel';
+import CompanyAccountManagement from '../components/admin/CompanyAccountManagement';
+import SecurityLimitsPanel from '../components/admin/SecurityLimitsPanel';
 import OrderBook from '../components/OrderBook';
 import NetPositions from '../components/NetPositions';
 import Watchlist from '../components/Watchlist';
@@ -12,8 +15,10 @@ import BanScript from '../components/BanScript';
 
 const TABS = [
   { key: 'dashboard', label: 'RMS Dashboard' },
+  { key: 'company-accounts', label: 'Company Account Management', superAdminOnly: true },
   { key: 'users', label: 'User & Role Management' },
   { key: 'oms-config', label: 'Server / OMS Config' },
+  { key: 'security-limits', label: 'Security-Wise Limits' },
   { key: 'kill-switch', label: 'Kill Switch' },
   { key: 'audit-log', label: 'Audit Log' },
   { key: 'orders', label: 'Order Book & Trade Book' },
@@ -23,6 +28,11 @@ const TABS = [
 
 const PANELS = {
   dashboard: () => <AdminDashboard />,
+  'company-accounts': () => (
+    <div style={{ padding: '20px' }}>
+      <CompanyAccountManagement />
+    </div>
+  ),
   users: () => (
     <div style={{ padding: '20px' }}>
       <UserRoleManagement />
@@ -31,6 +41,11 @@ const PANELS = {
   'oms-config': () => (
     <div style={{ padding: '20px' }}>
       <OmsConfigPanel />
+    </div>
+  ),
+  'security-limits': () => (
+    <div style={{ padding: '20px' }}>
+      <SecurityLimitsPanel />
     </div>
   ),
   'kill-switch': () => (
@@ -62,8 +77,10 @@ const PANELS = {
 };
 
 export default function AdminPortal() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'dashboard';
+  const visibleTabs = TABS.filter((t) => !t.superAdminOnly || user.role === 'SUPER_ADMIN');
+  const activeTab = visibleTabs.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'dashboard';
 
   const handleLogout = async () => {
     try {
@@ -137,7 +154,7 @@ export default function AdminPortal() {
 
       {/* Module Tab Bar */}
       <div style={tabBarStyles}>
-        {TABS.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.key}
             style={tabButtonStyle(activeTab === tab.key)}

@@ -8,6 +8,12 @@ export const isNonEmptyString = (value, maxLength = 255) => (
 	typeof value === 'string' && value.trim().length > 0 && value.length <= maxLength
 );
 
+// Minimum 8 characters; must include at least one alphabet, one numeral, and one special character/symbol.
+export const validatePasswordComplexity = (password) => (
+	/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[^a-zA-Z\d]).{8,}$/.test(password)
+);
+
+// Only LIMIT orders are supported (no Market, IOC, or Manual order types) per spec.
 export const validateOrder = ({ symbol, side, type, quantity, price }) => {
 	const numericQuantity = Number(quantity);
 	const numericPrice = price === undefined || price === null || price === '' ? null : Number(price);
@@ -16,11 +22,8 @@ export const validateOrder = ({ symbol, side, type, quantity, price }) => {
 		return 'Symbol must be an uppercase instrument code';
 	}
 	if (!['BUY', 'SELL'].includes(side)) return 'Side must be BUY or SELL';
-	if (!['MARKET', 'LIMIT'].includes(type)) return 'Type must be MARKET or LIMIT';
+	if (type !== 'LIMIT') return 'Only LIMIT orders are supported';
 	if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) return 'Quantity must be greater than zero';
-	if (type === 'LIMIT' && (!Number.isFinite(numericPrice) || numericPrice <= 0)) {
-		return 'Limit orders require a positive price';
-	}
-	if (type === 'MARKET' && numericPrice !== null) return 'Market orders cannot include a price';
+	if (!Number.isFinite(numericPrice) || numericPrice <= 0) return 'Limit orders require a positive price';
 	return null;
 };

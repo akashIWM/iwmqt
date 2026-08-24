@@ -5,7 +5,7 @@ import { logAudit } from '../utils/audit.js';
 
 const router = express.Router();
 
-router.use(authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN'));
+router.use(authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN', 'COMPANY_ACCOUNT'));
 
 // GET /api/kill-switch - current global + per-user halt state
 router.get('/', async (req, res) => {

@@ -4,18 +4,12 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { query } from '../db/postgres.js';
 import { logAuthEvent } from '../services/clickhouse/logger.js';
-import { isNonEmptyString, isValidEmail, normalizeEmail } from '../utils/validators.js';
+import { isNonEmptyString, isValidEmail, normalizeEmail, validatePasswordComplexity } from '../utils/validators.js';
 const MAX_FAILED_ATTEMPTS = 5;
 
 const getJwtSecret = () => {
   if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not configured');
   return process.env.JWT_SECRET;
-};
-
-const validatePasswordComplexity = (password) => {
-  // Minimum 8 characters; must include at least one alphabet, one numeral, and one special character/symbol.
-  const regex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[^a-zA-Z\d]).{8,}$/;
-  return regex.test(password);
 };
 
 export const sendOtp = async (req, res) => {
@@ -154,6 +148,14 @@ export const login = async (req, res) => {
 
     if (user.password_expires_at && new Date(user.password_expires_at) <= new Date()) {
       return res.status(403).json({ error: 'Password has expired. Please reset it before logging in.' });
+    }
+
+    if (user.company_id) {
+      const company = await query('SELECT status FROM companies WHERE code = $1', [user.company_id]);
+      if (company.rows[0]?.status === 'SUSPENDED') {
+        await logAuthEvent({ event_type: 'LOGIN_FAILURE', user_id: userId, success: false, ip_address: ip, user_agent: ua, metadata: 'Company suspended' });
+        return res.status(403).json({ error: "Your organisation's access has been suspended. Please contact your Super Admin." });
+      }
     }
 
     const validPassword = await bcrypt.compare(password, user.password_hash);

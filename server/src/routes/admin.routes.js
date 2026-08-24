@@ -1,12 +1,12 @@
 import express from 'express';
 import { query } from '../db/postgres.js';
-import { getAllUsers, updateUserRole, updateUserStatus } from '../controllers/admin.controller.js';
+import { getAllUsers, createUser, updateUserRole, updateUserStatus } from '../controllers/admin.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
 // GET /api/admin/stats - System-wide metrics for Admin Dashboard
-router.get('/stats', authenticate, authorize('ADMIN', 'RMS', 'SUPER_ADMIN', 'RMS_ADMIN'), async (req, res) => {
+router.get('/stats', authenticate, authorize('ADMIN', 'RMS', 'SUPER_ADMIN', 'RMS_ADMIN', 'COMPANY_ACCOUNT', 'PM'), async (req, res) => {
   try {
     const totalOrders = await query('SELECT COUNT(*) FROM orders');
     const totalUsers = await query('SELECT COUNT(*) FROM users');
@@ -28,10 +28,12 @@ router.get('/stats', authenticate, authorize('ADMIN', 'RMS', 'SUPER_ADMIN', 'RMS
 });
 
 // Apply the bouncer to ALL routes in this file
-router.use(authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN'));
+router.use(authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN', 'COMPANY_ACCOUNT'));
 
 // The actual API endpoints
 router.get('/users', getAllUsers);
+// User creation is Super Admin (global) / Company Account (own entity) only - not RMS Admin.
+router.post('/users', authorize('SUPER_ADMIN', 'COMPANY_ACCOUNT'), createUser);
 router.put('/users/:id/role', updateUserRole);
 router.put('/users/:id/status', updateUserStatus);
 

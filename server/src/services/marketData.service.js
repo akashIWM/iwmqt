@@ -10,6 +10,13 @@ const INITIAL_INSTRUMENTS = [
 
 let marketState = [...INITIAL_INSTRUMENTS];
 
+// Reference price for pre-trade band checks (order.routes.js). Returns null if the
+// symbol isn't in the mock market universe - callers should skip the check in that case.
+export const getLtp = (symbol) => {
+  const instrument = marketState.find((inst) => inst.symbol === symbol);
+  return instrument ? instrument.ltp : null;
+};
+
 export const initMarketDataSocket = (wss) => {
   console.log('📡 Market Data WebSocket Server initialized');
 

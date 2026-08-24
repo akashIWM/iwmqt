@@ -5,7 +5,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware.js';
 const router = express.Router();
 
 // GET /api/audit-log?limit= - recent RMS/admin actions, newest first
-router.get('/', authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN'), async (req, res) => {
+router.get('/', authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN', 'COMPANY_ACCOUNT'), async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
     const result = await query(

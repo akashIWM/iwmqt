@@ -16,6 +16,8 @@ import rmsRoutes from './routes/rms.routes.js';
 import killSwitchRoutes from './routes/kill-switch.routes.js';
 import omsConfigRoutes from './routes/oms-config.routes.js';
 import auditRoutes from './routes/audit.routes.js';
+import companyRoutes from './routes/company.routes.js';
+import securityLimitsRoutes from './routes/security-limits.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,6 +37,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/kill-switch', killSwitchRoutes);
 app.use('/api/oms-config', omsConfigRoutes);
 app.use('/api/audit-log', auditRoutes);
+app.use('/api/companies', companyRoutes);
+app.use('/api/security-limits', securityLimitsRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'Platform API is running' });

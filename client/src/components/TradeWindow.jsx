@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiFetch } from '../api';
 
+// Only LIMIT orders are supported per spec - no Market/IOC/Manual types on the ticket at all.
 export default function TradeWindow() {
   const [order, setOrder] = useState({
     symbol: 'NIFTY 24500 CE', // Default for now
     side: 'BUY',
-    type: 'MARKET',
+    type: 'LIMIT',
     quantity: 50, // Standard Nifty lot size
     price: 0
   });
@@ -14,6 +15,25 @@ export default function TradeWindow() {
     const { name, value } = e.target;
     setOrder(prev => ({ ...prev, [name]: value }));
   };
+
+  // F1/F2 always toggle Buy/Sell; +/- do too, but only when not typing in a field
+  // (both characters are valid input while entering quantity/price).
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
+
+      if (e.key === 'F1' || (!isTyping && e.key === '+')) {
+        e.preventDefault();
+        setOrder((p) => ({ ...p, side: 'BUY' }));
+      } else if (e.key === 'F2' || (!isTyping && e.key === '-')) {
+        e.preventDefault();
+        setOrder((p) => ({ ...p, side: 'SELL' }));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
 const handleSubmit = async (e) => {
     e.preventDefault();
@@ -119,24 +139,14 @@ const handleSubmit = async (e) => {
 
         <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
           <div style={{ flex: 1 }}>
-            <label style={styles.label}>ORDER TYPE</label>
-            <select name="type" value={order.type} onChange={handleChange} style={styles.select}>
-              <option value="MARKET">MARKET</option>
-              <option value="LIMIT">LIMIT</option>
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
             <label style={styles.label}>QUANTITY</label>
             <input type="number" name="quantity" value={order.quantity} onChange={handleChange} style={styles.input} min="1" />
           </div>
-        </div>
-
-        {order.type === 'LIMIT' && (
-          <div style={styles.formGroup}>
+          <div style={{ flex: 1 }}>
             <label style={styles.label}>LIMIT PRICE</label>
-            <input type="number" name="price" value={order.price} onChange={handleChange} style={styles.input} step="0.05" />
+            <input type="number" name="price" value={order.price} onChange={handleChange} style={styles.input} step="0.05" min="0.01" required />
           </div>
-        )}
+        </div>
 
         <button type="submit" style={styles.submitBtn}>
           {isBuy ? 'PLACE BUY ORDER' : 'PLACE SELL ORDER'}
