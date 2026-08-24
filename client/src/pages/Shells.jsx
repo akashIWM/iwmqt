@@ -353,13 +353,13 @@ export const RMSAdminShell = () => {
         
         <div style={styles.grid}>
           <AccessModule title="RMS Dashboard (14 Controls)" scope="✔ Edit" onClick={() => navigate('/app/admin')} />
-          <AccessModule title="User & Role Management" scope="✔ Own Entity" />
-          <AccessModule title="Server / OMS Config" scope="✔ Entity Scope" />
-          <AccessModule title="Kill Switch" scope="✔ User / Global" />
-          <AccessModule title="Audit Log" scope="✔ Entity-wide" />
-          <AccessModule title="Order Book & Trade Book" scope="View (Entity)" />
-          <AccessModule title="Net Positions" scope="View (Entity)" />
-          <AccessModule title="Watchlist & BanScript" scope="View-Only" />
+          <AccessModule title="User & Role Management" scope="✔ Own Entity" onClick={() => navigate('/app/admin?tab=users')} />
+          <AccessModule title="Server / OMS Config" scope="✔ Entity Scope" onClick={() => navigate('/app/admin?tab=oms-config')} />
+          <AccessModule title="Kill Switch" scope="✔ User / Global" onClick={() => navigate('/app/admin?tab=kill-switch')} />
+          <AccessModule title="Audit Log" scope="✔ Entity-wide" onClick={() => navigate('/app/admin?tab=audit-log')} />
+          <AccessModule title="Order Book & Trade Book" scope="View (Entity)" onClick={() => navigate('/app/admin?tab=orders')} />
+          <AccessModule title="Net Positions" scope="View (Entity)" onClick={() => navigate('/app/admin?tab=positions')} />
+          <AccessModule title="Watchlist & BanScript" scope="View-Only" onClick={() => navigate('/app/admin?tab=watchlist')} />
         </div>
       </main>
     </div>

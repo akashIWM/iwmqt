@@ -28,7 +28,7 @@ router.get('/stats', authenticate, authorize('ADMIN', 'RMS', 'SUPER_ADMIN', 'RMS
 });
 
 // Apply the bouncer to ALL routes in this file
-router.use(authenticate, authorize('SUPER_ADMIN'));
+router.use(authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN'));
 
 // The actual API endpoints
 router.get('/users', getAllUsers);

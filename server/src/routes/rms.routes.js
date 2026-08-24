@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../db/postgres.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
+import { logAudit } from '../utils/audit.js';
 
 const router = express.Router();
 
@@ -23,6 +24,7 @@ router.post('/ban', authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN'), async (
       `INSERT INTO banned_scripts (symbol, reason) VALUES ($1, $2) ON CONFLICT (symbol) DO UPDATE SET reason = $2 RETURNING *`,
       [symbol, reason || 'Volatility Limit Reached']
     );
+    await logAudit(req.user.userId, 'BAN_SCRIPT', symbol, reason || null);
     res.status(201).json({ message: `Script ${symbol} banned successfully`, ban: result.rows[0] });
   } catch (error) {
     console.error('Ban Script Error:', error);
@@ -35,6 +37,7 @@ router.delete('/unban/:symbol', authenticate, authorize('RMS_ADMIN', 'SUPER_ADMI
   try {
     const { symbol } = req.params;
     await query('DELETE FROM banned_scripts WHERE symbol = $1', [symbol]);
+    await logAudit(req.user.userId, 'UNBAN_SCRIPT', symbol, null);
     res.status(200).json({ message: `Script ${symbol} unbanned successfully` });
   } catch (error) {
     console.error('Unban Error:', error);

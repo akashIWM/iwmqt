@@ -1,19 +1,20 @@
 import express from 'express';
-import { query } from '../db/postgres.js'; 
-import { authenticate } from '../middleware/auth.middleware.js'; 
+import { query } from '../db/postgres.js';
+import { authenticate } from '../middleware/auth.middleware.js';
 import { validateOrder } from '../utils/validators.js';
 
 const router = express.Router();
 
-// GET /api/orders - Fetch all orders for the logged-in user
+const isRmsRole = (role) => role === 'RMS_ADMIN' || role === 'SUPER_ADMIN';
+
+// GET /api/orders - RMS/Super Admin see all users' orders; everyone else sees only their own
 router.get('/', authenticate, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
 
-    const userOrders = await query(
-      `SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC`,
-      [userId]
-    );
+    const userOrders = isRmsRole(req.user.role)
+      ? await query(`SELECT * FROM orders ORDER BY created_at DESC LIMIT 200`)
+      : await query(`SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC`, [userId]);
 
     res.status(200).json({ orders: userOrders.rows });
   } catch (error) {
@@ -31,17 +32,48 @@ router.post('/place', authenticate, async (req, res) => {
 
     if (validationError) return res.status(400).json({ message: validationError });
 
-    // --- RMS PRE-TRADE CHECK ---
+    // --- RMS PRE-TRADE CHECKS ---
+    const killSwitchCheck = await query(
+      `SELECT * FROM kill_switches WHERE scope = 'GLOBAL' OR (scope = 'USER' AND target_user_id = $1)`,
+      [userId]
+    );
+    const globalHalt = killSwitchCheck.rows.find((row) => row.scope === 'GLOBAL');
+    if (globalHalt) {
+      return res.status(400).json({
+        message: `Order Rejected: Trading is currently HALTED platform-wide by RMS. Reason: ${globalHalt.reason}`
+      });
+    }
+    const userHalt = killSwitchCheck.rows.find((row) => row.scope === 'USER');
+    if (userHalt) {
+      return res.status(400).json({
+        message: `Order Rejected: Your trading access has been suspended by RMS. Reason: ${userHalt.reason}`
+      });
+    }
+
     // Check if the symbol is in the banned_scripts table
     const normalizedSymbol = symbol.trim().toUpperCase();
     const banCheck = await query('SELECT * FROM banned_scripts WHERE symbol = $1', [normalizedSymbol]);
-    
+
     if (banCheck.rows.length > 0) {
-      return res.status(400).json({ 
-        message: `Order Rejected: ${symbol} is currently BANNED by RMS risk controls. Reason: ${banCheck.rows[0].reason}` 
+      return res.status(400).json({
+        message: `Order Rejected: ${symbol} is currently BANNED by RMS risk controls. Reason: ${banCheck.rows[0].reason}`
       });
     }
-    // --- END RMS CHECK ---
+
+    const omsConfig = await query('SELECT * FROM oms_config WHERE id = 1');
+    const { max_order_quantity: maxOrderQuantity, max_order_value: maxOrderValue } = omsConfig.rows[0];
+    const numericQuantity = Number(quantity);
+    if (numericQuantity > Number(maxOrderQuantity)) {
+      return res.status(400).json({
+        message: `Order Rejected: Quantity ${numericQuantity} exceeds the RMS-configured limit of ${maxOrderQuantity}`
+      });
+    }
+    if (type === 'LIMIT' && numericQuantity * Number(price) > Number(maxOrderValue)) {
+      return res.status(400).json({
+        message: `Order Rejected: Order value exceeds the RMS-configured limit of ${maxOrderValue}`
+      });
+    }
+    // --- END RMS CHECKS ---
 
     const newOrder = await query(
       `INSERT INTO orders (user_id, symbol, side, type, quantity, price, status) 
