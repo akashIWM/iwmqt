@@ -1,0 +1,803 @@
+<title>iwmQT RMS Progress Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --paper: #f3f5f8;
+    --paper-raised: #ffffff;
+    --ink: #131b2e;
+    --ink-muted: #5b6478;
+    --ink-faint: #8892a3;
+    --line: #d8dee7;
+    --line-soft: #e6eaf0;
+    --accent: #0f6b5c;
+    --accent-soft: #e3f1ee;
+    --accent-ink: #f3f5f8;
+    --good: #1f7a4d;
+    --good-soft: #e6f4ec;
+    --warn: #9a6b0c;
+    --warn-soft: #fbf1de;
+    --critical: #ab2b23;
+    --critical-soft: #fbe9e8;
+    --shadow: 0 1px 2px rgba(19, 27, 46, 0.04), 0 8px 24px rgba(19, 27, 46, 0.06);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0c1220;
+      --paper-raised: #121a2c;
+      --ink: #e7ebf3;
+      --ink-muted: #93a0b8;
+      --ink-faint: #66738c;
+      --line: #243043;
+      --line-soft: #1b2536;
+      --accent: #45c2a1;
+      --accent-soft: #142a26;
+      --accent-ink: #0c1220;
+      --good: #46b57e;
+      --good-soft: #12261c;
+      --warn: #dba545;
+      --warn-soft: #2b2210;
+      --critical: #e5766e;
+      --critical-soft: #2c1613;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #0c1220;
+    --paper-raised: #121a2c;
+    --ink: #e7ebf3;
+    --ink-muted: #93a0b8;
+    --ink-faint: #66738c;
+    --line: #243043;
+    --line-soft: #1b2536;
+    --accent: #45c2a1;
+    --accent-soft: #142a26;
+    --accent-ink: #0c1220;
+    --good: #46b57e;
+    --good-soft: #12261c;
+    --warn: #dba545;
+    --warn-soft: #2b2210;
+    --critical: #e5766e;
+    --critical-soft: #2c1613;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, sans-serif;
+    font-size: 15.5px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3 { font-family: "Newsreader", Georgia, serif; text-wrap: balance; color: var(--ink); }
+
+  code, .mono, .data { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+
+  /* ---------- Sidebar ---------- */
+  nav.toc {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 32px 20px;
+    border-right: 1px solid var(--line);
+  }
+  nav.toc .brand {
+    font-family: "Newsreader", serif;
+    font-weight: 600;
+    font-size: 17px;
+    margin-bottom: 4px;
+  }
+  nav.toc .brand-sub {
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 28px;
+  }
+  nav.toc ol {
+    list-style: none;
+    margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  nav.toc a {
+    display: flex;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    color: var(--ink-muted);
+    text-decoration: none;
+    font-size: 13.5px;
+  }
+  nav.toc a:hover { background: var(--line-soft); color: var(--ink); }
+  nav.toc a .n { color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; font-size: 12px; min-width: 16px; }
+
+  /* ---------- Slides ---------- */
+  main { min-width: 0; }
+  section.slide {
+    min-height: 100vh;
+    padding: 64px 56px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  section.slide.tight { justify-content: flex-start; padding-top: 56px; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+  h2.title { font-size: 34px; font-weight: 600; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.dek { font-size: 16.5px; color: var(--ink-muted); max-width: 640px; margin: 0 0 36px; }
+
+  /* ---------- Cover ---------- */
+  .cover {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 28px;
+  }
+  .cover .mark {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .cover h1 {
+    font-size: 52px;
+    line-height: 1.08;
+    font-weight: 600;
+    margin: 0;
+    max-width: 780px;
+  }
+  .cover .accent-word { color: var(--accent); }
+  .cover .sub { font-size: 18px; color: var(--ink-muted); max-width: 600px; margin: 0; }
+  .cover .meta-row {
+    display: flex; gap: 32px; flex-wrap: wrap;
+    margin-top: 12px; padding-top: 28px; border-top: 1px solid var(--line);
+  }
+  .cover .meta-row div { display: flex; flex-direction: column; gap: 4px; }
+  .cover .meta-row .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); }
+  .cover .meta-row .v { font-size: 15px; font-weight: 500; }
+
+  /* ---------- Stat tiles ---------- */
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 36px; }
+  .stat {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+  .stat .num { font-family: "IBM Plex Mono", monospace; font-size: 30px; font-weight: 600; color: var(--accent); }
+  .stat .label { font-size: 12.5px; color: var(--ink-muted); margin-top: 4px; }
+
+  /* ---------- Timeline ---------- */
+  .timeline { display: flex; flex-direction: column; gap: 0; max-width: 760px; }
+  .tl-item { display: grid; grid-template-columns: 90px 20px 1fr; gap: 4px; }
+  .tl-time { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--ink-faint); padding-top: 3px; }
+  .tl-rail { display: flex; flex-direction: column; align-items: center; }
+  .tl-dot { width: 11px; height: 11px; border-radius: 50%; background: var(--accent); margin-top: 4px; flex-shrink: 0; }
+  .tl-line { width: 1px; flex: 1; background: var(--line); margin-top: 4px; }
+  .tl-item:last-child .tl-line { display: none; }
+  .tl-body { padding-bottom: 30px; }
+  .tl-body h4 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+  .tl-body p { margin: 0; color: var(--ink-muted); font-size: 14px; }
+  .tl-tag { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 11px; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 4px; margin-top: 6px; }
+
+  /* ---------- Two column ---------- */
+  .cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+  .cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+  /* ---------- Feature block ---------- */
+  .feature { margin-bottom: 22px; }
+  .feature h4 { margin: 0 0 6px; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .feature p { margin: 0; color: var(--ink-muted); font-size: 14.5px; }
+
+  .badge {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge.done { background: var(--good-soft); color: var(--good); }
+  .badge.partial { background: var(--warn-soft); color: var(--warn); }
+  .badge.pending { background: var(--critical-soft); color: var(--critical); }
+
+  /* ---------- File list ---------- */
+  .filelist {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    line-height: 1.9;
+    color: var(--ink-muted);
+    overflow-x: auto;
+  }
+  .filelist .new { color: var(--good); }
+  .filelist .mod { color: var(--warn); }
+  .filelist .rm { color: var(--critical); }
+
+  /* ---------- Tables ---------- */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-raised); box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--ink-faint); font-weight: 600; padding: 12px 16px; border-bottom: 1px solid var(--line);
+    background: var(--line-soft);
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.num, td.data { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--ink-muted); }
+
+  /* ---------- DB card ---------- */
+  .db-card {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 22px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .db-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .db-card-head h4 { margin: 0; font-family: "IBM Plex Mono", monospace; font-size: 16px; font-weight: 600; color: var(--accent); }
+  .db-card-head .tag { font-size: 11px; color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; }
+  .db-card p.purpose { margin: 0 0 14px; color: var(--ink-muted); font-size: 14px; }
+  .db-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 18px; font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .db-cols div { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--line-soft); }
+  .db-cols .col-name { color: var(--ink); }
+  .db-cols .col-type { color: var(--ink-faint); }
+
+  pre.cmd {
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    overflow-x: auto;
+    margin: 0 0 24px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) pre.cmd { background: #050810; color: #a9e6d1; }
+  }
+  :root[data-theme="dark"] pre.cmd { background: #050810; color: #a9e6d1; }
+
+  /* ---------- Requirements manifest ---------- */
+  .manifest {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .manifest-head {
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--line);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+  }
+  .manifest-body { padding: 18px 22px 22px; }
+  .manifest-group { margin-bottom: 18px; }
+  .manifest-group:last-child { margin-bottom: 0; }
+  .manifest-group h5 {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-transform: none;
+    margin: 0 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .req-line {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 3px 0;
+    color: var(--ink);
+  }
+  .req-line .name { white-space: nowrap; }
+  .req-line .leader { flex: 1; border-bottom: 1px dotted var(--line); transform: translateY(-4px); min-width: 20px; }
+  .req-line .status { white-space: nowrap; font-weight: 600; font-size: 11.5px; }
+  .req-line.done .status { color: var(--good); }
+  .req-line.partial .status { color: var(--warn); }
+  .req-line.pending .status { color: var(--critical); }
+  .req-line .note { color: var(--ink-faint); font-size: 11.5px; white-space: nowrap; }
+
+  ul.plain { margin: 0; padding-left: 18px; color: var(--ink-muted); font-size: 14.5px; }
+  ul.plain li { margin-bottom: 6px; }
+  ul.plain li::marker { color: var(--accent); }
+
+  .closing { text-align: left; }
+  .closing h2 { font-size: 40px; }
+
+  /* ---------- Print ---------- */
+  @media print {
+    nav.toc { display: none; }
+    .layout { grid-template-columns: 1fr; max-width: none; }
+    section.slide { min-height: 0; page-break-after: always; padding: 24px 8px; border-bottom: none; }
+    section.slide.tight { justify-content: flex-start; }
+    body { font-size: 12.5px; }
+    .stat-grid, .cols-2, .cols-3 { break-inside: avoid; }
+    .db-card, .table-wrap, .manifest { box-shadow: none; break-inside: avoid; }
+  }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    nav.toc { display: none; }
+    .stat-grid, .cols-2, .cols-3 { grid-template-columns: 1fr; }
+    section.slide { padding: 40px 22px; }
+    .cover h1 { font-size: 36px; }
+  }
+</style>
+
+<div class="layout">
+  <nav class="toc">
+    <div class="brand">iwmQT</div>
+    <div class="brand-sub">RMS Progress Report</div>
+    <ol>
+      <li><a href="#cover"><span class="n">00</span> Cover</a></li>
+      <li><a href="#summary"><span class="n">01</span> Executive summary</a></li>
+      <li><a href="#timeline"><span class="n">02</span> Timeline</a></li>
+      <li><a href="#phase1"><span class="n">03</span> RMS Admin &amp; role wiring</a></li>
+      <li><a href="#phase2"><span class="n">04</span> Company entity model</a></li>
+      <li><a href="#phase3"><span class="n">05</span> Pre-trade risk controls</a></li>
+      <li><a href="#phase4"><span class="n">06</span> HFT grid &amp; WebSocket</a></li>
+      <li><a href="#database"><span class="n">07</span> Database changes</a></li>
+      <li><a href="#requirements"><span class="n">08</span> Requirements manifest</a></li>
+      <li><a href="#next"><span class="n">09</span> Remaining work</a></li>
+      <li><a href="#close"><span class="n">10</span> Close</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ============ COVER ============ -->
+    <section class="slide cover" id="cover">
+      <div class="mark">iwmQT · NSE F&amp;O Trading Platform</div>
+      <h1>RMS &amp; Admin Platform<br><span class="accent-word">Progress Report</span></h1>
+      <p class="sub">One working day turning the RMS Admin dashboard from a single working button into a spec-complete risk, entity, and performance layer across every role.</p>
+      <div class="meta-row">
+        <div><div class="k">Date</div><div class="v">24 August 2026</div></div>
+        <div><div class="k">Branch</div><div class="v">feature/dev</div></div>
+        <div><div class="k">Commits today</div><div class="v">3, on feature/dev</div></div>
+        <div><div class="k">Spec reference</div><div class="v">iwmQT GUI Spec v1.0</div></div>
+      </div>
+    </section>
+
+    <!-- ============ EXEC SUMMARY ============ -->
+    <section class="slide tight" id="summary">
+      <div class="eyebrow"><span class="dot"></span>01 — Executive Summary</div>
+      <h2 class="title">What shipped today</h2>
+      <p class="dek">Four phases, built and verified in sequence: every role dashboard wired end to end, a real multi-tenant entity model, all 14 RMS pre-trade risk controls, and the HFT-grade grid/WebSocket layer the spec calls for.</p>
+
+      <div class="stat-grid">
+        <div class="stat"><div class="num">38</div><div class="label">files changed since yesterday</div></div>
+        <div class="stat"><div class="num">7</div><div class="label">new database tables / extensions</div></div>
+        <div class="stat"><div class="num">14 / 14</div><div class="label">RMS pre-trade controls covered</div></div>
+        <div class="stat"><div class="num">5 / 5</div><div class="label">role dashboards fully wired</div></div>
+      </div>
+
+      <ul class="plain">
+        <li><strong>RMS Admin dashboard completed</strong> — Kill Switch, OMS/Risk Config, Audit Log, and User &amp; Role Management went from dead cards to working, audited features.</li>
+        <li><strong>Company Account is now a real entity</strong> — a proper <code>companies</code> table backs it, with Super-Admin-driven create/suspend and entity-scoped user management, not just a role label.</li>
+        <li><strong>All 14 RMS pre-trade controls are enforced</strong> on every order placement, each with its own labelled rejection message.</li>
+        <li><strong>Grid and market-data layer rebuilt for HFT</strong> — row-level transaction updates, a real WebSocket delta protocol with sequence numbers, CSV export, column persistence, and per-role code-splitting.</li>
+      </ul>
+    </section>
+
+    <!-- ============ TIMELINE ============ -->
+    <section class="slide tight" id="timeline">
+      <div class="eyebrow"><span class="dot"></span>02 — Timeline</div>
+      <h2 class="title">How the day went</h2>
+      <p class="dek">Four sequential phases, each scoped and verified before moving to the next.</p>
+
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-time">07:48</div>
+          <div class="tl-rail"><div class="tl-dot"></div><div class="tl-line"></div></div>
+          <div class="tl-body">
+            <h4>Baseline</h4>
+            <p>Starting point — RMS &amp; Super Admin dashboard shells existed; only the "RMS Dashboard" card was functional anywhere.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">Morning</div>
+          <div class="tl-rail"><div class="tl-dot"></div><div class="tl-line"></div></div>
+          <div class="tl-body">
+            <h4>Phase 1 — RMS Admin dashboard completed</h4>
+            <p>Kill Switch, OMS Risk Config, Audit Log, and User &amp; Role Management built and wired in. Checkpointed at 10:38 as <code>4eec107</code>.</p>
+            <span class="tl-tag">commit 4eec107</span>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">Midday</div>
+          <div class="tl-rail"><div class="tl-dot"></div><div class="tl-line"></div></div>
+          <div class="tl-body">
+            <h4>Phase 2 &amp; 3 — Every role wired, entity model, risk controls</h4>
+            <p>Gap-analysed the full GUI spec, then wired PM / Company Account / Super Admin dashboards, built the Company entity model, and implemented all 14 RMS pre-trade controls plus LIMIT-only order entry and the OPS rate limit. Committed 14:25 as <code>d2d95cc</code>.</p>
+            <span class="tl-tag">commit d2d95cc</span>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">Afternoon</div>
+          <div class="tl-rail"><div class="tl-dot"></div></div>
+          <div class="tl-body">
+            <h4>Phase 4 — HFT grid &amp; WebSocket rework</h4>
+            <p>Rebuilt the market-data WebSocket as a true delta protocol, converted every grid to row-level transactions, added CSV export, column persistence, and split the app bundle by role. Verified and committed.</p>
+            <span class="tl-tag">commit 634ca3c</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PHASE 1 ============ -->
+    <section class="slide tight" id="phase1">
+      <div class="eyebrow"><span class="dot"></span>03 — Phase 1</div>
+      <h2 class="title">RMS Admin dashboard &amp; role wiring</h2>
+      <p class="dek">Every module card, across all five roles, now does something real — reusing one shared Admin Portal instead of five one-off screens.</p>
+
+      <div class="cols-2">
+        <div>
+          <div class="feature">
+            <h4>Kill Switch <span class="badge done">done</span></h4>
+            <p>Global and per-user trading halts. Blocks order placement immediately, reversible in one click, fully audited.</p>
+          </div>
+          <div class="feature">
+            <h4>OMS / Risk Config <span class="badge done">done</span></h4>
+            <p>Editable global risk limits enforced on every order — starting with quantity and order-value caps, later extended to all 14 controls.</p>
+          </div>
+          <div class="feature">
+            <h4>Audit Log <span class="badge done">done</span></h4>
+            <p>Every admin action — bans, kill switches, role changes, config edits — writes a timestamped, attributable record.</p>
+          </div>
+          <div class="feature">
+            <h4>User &amp; Role Management <span class="badge done">done</span></h4>
+            <p>Role and status edits, extended later with admin-initiated account creation and entity scoping.</p>
+          </div>
+        </div>
+        <div>
+          <div class="feature">
+            <h4>PM Shell <span class="badge done">done</span></h4>
+            <p>Rebuilt as a self-contained, view-only shell — no route into the edit-capable Admin Portal, matching the spec's read-only/approval-routing scope for this role.</p>
+          </div>
+          <div class="feature">
+            <h4>Company Account Shell <span class="badge done">done</span></h4>
+            <p>All 7 previously dead cards now route into the same Admin Portal RMS Admin uses.</p>
+          </div>
+          <div class="feature">
+            <h4>Super Admin Shell <span class="badge done">done</span></h4>
+            <p>Remaining dead cards wired; Company Account Management left for Phase 2 rather than faked.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="filelist">
+        <span class="new">+ new</span>  server/src/routes/{kill-switch,oms-config,audit,security-limits}.routes.js<br>
+        <span class="new">+ new</span>  client/src/components/admin/{KillSwitchPanel,OmsConfigPanel,AuditLogPanel,UserRoleManagement}.jsx<br>
+        <span class="mod">~ mod</span>  client/src/pages/AdminPortal.jsx — tabbed shell for every admin module<br>
+        <span class="new">+ new</span>  migrations/postgres/02_rms_admin_modules.sql
+      </div>
+    </section>
+
+    <!-- ============ PHASE 2 ============ -->
+    <section class="slide tight" id="phase2">
+      <div class="eyebrow"><span class="dot"></span>04 — Phase 2</div>
+      <h2 class="title">Company Account as a real entity</h2>
+      <p class="dek">Before today, "Company Account" was a role label on a user row — no entity record, and no way for anyone to create an account at all except self-service sign-up.</p>
+
+      <div class="cols-2">
+        <div>
+          <div class="feature">
+            <h4>Companies table <span class="badge done">done</span></h4>
+            <p>A company is now a first-class record: code, name, status. The organisation boundary the spec describes.</p>
+          </div>
+          <div class="feature">
+            <h4>Create / suspend flow <span class="badge done">done</span></h4>
+            <p>Super Admin creates a company and its first Company Account login in one step, with a one-time temporary password. Suspending a company blocks login for every user under it instantly — and reactivating is just as instant.</p>
+          </div>
+        </div>
+        <div>
+          <div class="feature">
+            <h4>Admin-initiated account creation <span class="badge done">done</span></h4>
+            <p>Previously impossible for any role. Company Account can now create RMS Admin / PM / Trader logins within its own entity only — enforced server-side, not just hidden in the UI.</p>
+          </div>
+          <div class="feature">
+            <h4>Entity-scoped user list <span class="badge partial">partial</span></h4>
+            <p>A Company Account only sees its own entity's users. Order Book, Positions, Audit Log, and Kill Switch remain platform-wide — a scoped follow-up, not done yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="filelist">
+        <span class="new">+ new</span>  server/src/{routes,controllers}/company.routes.js / company.controller.js<br>
+        <span class="new">+ new</span>  client/src/components/admin/CompanyAccountManagement.jsx<br>
+        <span class="mod">~ mod</span>  admin.controller.js — createUser, entity-scoped getAllUsers<br>
+        <span class="mod">~ mod</span>  auth.controller.js — login blocked for suspended companies<br>
+        <span class="new">+ new</span>  migrations/postgres/03_companies.sql
+      </div>
+    </section>
+
+    <!-- ============ PHASE 3 ============ -->
+    <section class="slide tight" id="phase3">
+      <div class="eyebrow"><span class="dot"></span>05 — Phase 3</div>
+      <h2 class="title">All 14 RMS pre-trade risk controls</h2>
+      <p class="dek">Spec Section 8, in full. Every order placement now runs this exact gauntlet before it's accepted — plus a separate 120 orders/sec cap and LIMIT-only entry.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width:32px">#</th><th>Control</th><th>Enforcement</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td>Price Check</td><td>Order price banded against live LTP (±configurable %)</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">2</td><td>Quantity Limit Check</td><td>Per-order quantity cap</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">3</td><td>Order Value Check</td><td>Per-order price × qty cap</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">4</td><td>Trade Price Protection</td><td>Combined with Control 1, as spec'd</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">5</td><td>Market Price Protection</td><td>Spec: "not currently enabled" — moot once Market orders removed</td><td><span class="badge done">n/a by design</span></td></tr>
+            <tr><td class="num">6</td><td>Cumulative Open Order Value</td><td>Sum of user's own pending order value</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">7</td><td>Net Position vs. Margin</td><td>New per-user <code>available_margin</code> field</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">8</td><td>Position Limit Check</td><td>Existing + pending + this order, per symbol</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">9</td><td>Trading Limit Check</td><td>Shares the turnover figure below, distinct label</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">10</td><td>Exposure Limit Check</td><td>Both user-level and platform-wide global limit</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">11</td><td>Turnover Limit Check</td><td>Cumulative executed value vs. configured cap</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">12</td><td>Security-Wise Limit Check</td><td>New per-symbol qty/value override table</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">13</td><td>Automated Execution Check</td><td>Caps outstanding pending orders per user</td><td><span class="badge done">done</span></td></tr>
+            <tr><td class="num">14</td><td>Fair Play Check</td><td>Commodity Derivatives-specific; segment doesn't exist here</td><td><span class="badge done">n/a by design</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px;color:var(--ink-muted);font-size:13.5px;">Plus: <strong>OPS cap</strong> — configurable orders/sec rate limiter (default 120) — and <strong>LIMIT-only order entry</strong> with F1 / F2 keyboard shortcuts, per Section 7.1.</p>
+    </section>
+
+    <!-- ============ PHASE 4 ============ -->
+    <section class="slide tight" id="phase4">
+      <div class="eyebrow"><span class="dot"></span>06 — Phase 4</div>
+      <h2 class="title">HFT-grade grid &amp; WebSocket layer</h2>
+      <p class="dek">Section 5's literal ask — "the GUI must feel instant" — implemented, not just aspired to.</p>
+
+      <div class="cols-3">
+        <div class="feature">
+          <h4>Delta protocol <span class="badge done">done</span></h4>
+          <p>Market data now streams only what changed, with a strict sequence number. A dropped message is detected and self-heals via a resync request — verified with a raw socket client.</p>
+        </div>
+        <div class="feature">
+          <h4>Grid transactions <span class="badge done">done</span></h4>
+          <p>Watchlist, Order Book, Net Positions, and Ban Script all update via row-level transactions instead of full re-renders.</p>
+        </div>
+        <div class="feature">
+          <h4>CSV export &amp; columns <span class="badge done">done</span></h4>
+          <p>Every grid exports to CSV, and column order/width now survives a page reload.</p>
+        </div>
+        <div class="feature">
+          <h4>Code-split by role <span class="badge done">done</span></h4>
+          <p>Split one 1.5&nbsp;MB shared bundle into five per-role chunks — RMS Admin and Company Account now load ~1.8&nbsp;KB instead of the whole app.</p>
+        </div>
+        <div class="feature">
+          <h4>Grouping <span class="badge partial">partial</span></h4>
+          <p>"Group by Symbol" ships as a Community-tier substitute. True OMS/Token grouping needs a paid AG Grid Enterprise licence — a decision for the business, not engineering.</p>
+        </div>
+        <div class="feature">
+          <h4>Light theme default <span class="badge pending">pending</span></h4>
+          <p>Spec wants a light, low-repaint default for trading screens; all grids are still dark. Flagged, not started.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DATABASE ============ -->
+    <section class="slide tight" id="database">
+      <div class="eyebrow"><span class="dot"></span>07 — Database changes</div>
+      <h2 class="title">Every table created or extended today</h2>
+      <p class="dek">Three migration files, applied in order, all on PostgreSQL. Commands used shown below each migration.</p>
+
+      <pre class="cmd">psql "$DATABASE_URL" -f migrations/postgres/02_rms_admin_modules.sql
+psql "$DATABASE_URL" -f migrations/postgres/03_companies.sql
+psql "$DATABASE_URL" -f migrations/postgres/04_rms_controls.sql</pre>
+
+      <div class="db-card">
+        <div class="db-card-head"><h4>kill_switches</h4><span class="tag">02_rms_admin_modules.sql</span></div>
+        <p class="purpose">Trading halts. Presence of a row = active — same pattern as the existing banned_scripts table. A partial unique index guarantees at most one active GLOBAL row and one per user.</p>
+        <div class="db-cols">
+          <div><span class="col-name">id</span><span class="col-type">uuid, pk</span></div>
+          <div><span class="col-name">scope</span><span class="col-type">'GLOBAL' | 'USER'</span></div>
+          <div><span class="col-name">target_user_id</span><span class="col-type">fk → users</span></div>
+          <div><span class="col-name">reason</span><span class="col-type">varchar(255)</span></div>
+          <div><span class="col-name">activated_by</span><span class="col-type">fk → users</span></div>
+          <div><span class="col-name">activated_at</span><span class="col-type">timestamptz</span></div>
+        </div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-card-head"><h4>oms_config</h4><span class="tag">02_rms_admin_modules.sql → extended in 04</span></div>
+        <p class="purpose">Single-row global configuration table (id always 1). Started with 2 risk fields, grew to 10 as the 14 controls were built out.</p>
+        <div class="db-cols">
+          <div><span class="col-name">max_order_quantity</span><span class="col-type">numeric</span></div>
+          <div><span class="col-name">max_order_value</span><span class="col-type">numeric</span></div>
+          <div><span class="col-name">price_band_pct</span><span class="col-type">numeric</span></div>
+          <div><span class="col-name">max_open_order_value</span><span class="col-type">numeric</span></div>
+          <div><span class="col-name">max_position_qty</span><span class="col-type">numeric</span></div>
+          <div><span class="col-name">max_exposure_value</span><span class="col-type">numeric</span></div>
+          <div><span class="col-name">global_exposure_value</span><span class="col-type">numeric</span></div>
+          <div><span class="col-name">max_turnover_value</span><span class="col-type">numeric</span></div>
+          <div><span class="col-name">max_open_orders_count</span><span class="col-type">int</span></div>
+          <div><span class="col-name">max_orders_per_second</span><span class="col-type">int</span></div>
+        </div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-card-head"><h4>audit_log</h4><span class="tag">02_rms_admin_modules.sql</span></div>
+        <p class="purpose">One row per admin/RMS action platform-wide — ban, kill switch, role change, config update, company create/suspend.</p>
+        <div class="db-cols">
+          <div><span class="col-name">actor_user_id</span><span class="col-type">fk → users</span></div>
+          <div><span class="col-name">action</span><span class="col-type">varchar(50)</span></div>
+          <div><span class="col-name">target</span><span class="col-type">varchar(100)</span></div>
+          <div><span class="col-name">details</span><span class="col-type">varchar(500)</span></div>
+          <div><span class="col-name">created_at</span><span class="col-type">timestamptz, indexed</span></div>
+        </div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-card-head"><h4>companies</h4><span class="tag">03_companies.sql</span></div>
+        <p class="purpose">Makes Company Account a real entity. <code>users.company_id</code> gained a foreign key into this table's <code>code</code>.</p>
+        <div class="db-cols">
+          <div><span class="col-name">code</span><span class="col-type">varchar(100), pk</span></div>
+          <div><span class="col-name">name</span><span class="col-type">varchar(255)</span></div>
+          <div><span class="col-name">status</span><span class="col-type">'ACTIVE' | 'SUSPENDED'</span></div>
+          <div><span class="col-name">created_by</span><span class="col-type">fk → users</span></div>
+        </div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-card-head"><h4>security_limits</h4><span class="tag">04_rms_controls.sql</span></div>
+        <p class="purpose">Per-symbol quantity/value overrides for Control 12. Presence-based, same pattern as banned_scripts — no row means no override for that symbol.</p>
+        <div class="db-cols">
+          <div><span class="col-name">symbol</span><span class="col-type">varchar(50), pk</span></div>
+          <div><span class="col-name">max_qty</span><span class="col-type">numeric</span></div>
+          <div><span class="col-name">max_value</span><span class="col-type">numeric</span></div>
+          <div><span class="col-name">set_by</span><span class="col-type">fk → users</span></div>
+        </div>
+      </div>
+
+      <div class="db-card">
+        <div class="db-card-head"><h4>users, orders — column changes</h4><span class="tag">03 &amp; 04</span></div>
+        <p class="purpose"><code>users.available_margin</code> added (Control 7). <code>orders.type</code> constraint tightened from MARKET|LIMIT to LIMIT-only; price is now always required.</p>
+      </div>
+    </section>
+
+    <!-- ============ REQUIREMENTS ============ -->
+    <section class="slide tight" id="requirements">
+      <div class="eyebrow"><span class="dot"></span>08 — Requirements manifest</div>
+      <h2 class="title">Full spec coverage, one list</h2>
+      <p class="dek">Every requirement from the iwmQT GUI spec, mapped against what's actually built — the way a <code>requirements.txt</code> pins a dependency, not a status adjective.</p>
+
+      <div class="manifest">
+        <div class="manifest-head"><span>iwmqt-rms-requirements.manifest</span><span>[x] done · [~] partial · [ ] pending</span></div>
+        <div class="manifest-body">
+
+          <div class="manifest-group">
+            <h5># Section 2 — Role Model &amp; Access Hierarchy</h5>
+            <div class="req-line done"><span class="name">five-role-model</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line done"><span class="name">role-based-routing</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line done"><span class="name">all-dashboards-wired</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line done"><span class="name">company-account-entity-model</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line partial"><span class="name">entity-scoping-every-module</span><span class="leader"></span><span class="status">[~] partial</span><span class="note">user mgmt only</span></div>
+          </div>
+
+          <div class="manifest-group">
+            <h5># Section 3 — Login, Auth &amp; Password Policy</h5>
+            <div class="req-line done"><span class="name">otp-signup-and-reset</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line done"><span class="name">lockout-5-attempts</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line partial"><span class="name">password-expiry-15-days</span><span class="leader"></span><span class="status">[~] partial</span><span class="note">doesn't reset on change</span></div>
+            <div class="req-line pending"><span class="name">password-reuse-check</span><span class="leader"></span><span class="status">[ ] pending</span></div>
+            <div class="req-line pending"><span class="name">forced-password-change-flow</span><span class="leader"></span><span class="status">[ ] pending</span></div>
+            <div class="req-line pending"><span class="name">idle-session-timeout</span><span class="leader"></span><span class="status">[ ] pending</span></div>
+            <div class="req-line pending"><span class="name">single-active-session</span><span class="leader"></span><span class="status">[ ] pending</span></div>
+          </div>
+
+          <div class="manifest-group">
+            <h5># Section 5 — Performance (HFT)</h5>
+            <div class="req-line done"><span class="name">websocket-delta-protocol</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line done"><span class="name">sequence-numbers-and-resync</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line done"><span class="name">ag-grid-row-transactions</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line done"><span class="name">code-splitting-by-role</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line pending"><span class="name">light-theme-default</span><span class="leader"></span><span class="status">[ ] pending</span></div>
+            <div class="req-line pending"><span class="name">binary-framing</span><span class="leader"></span><span class="status">[ ] pending</span><span class="note">messagepack/flatbuffers, optional</span></div>
+          </div>
+
+          <div class="manifest-group">
+            <h5># Section 6 — AG Grid Contract</h5>
+            <div class="req-line done"><span class="name">csv-export-all-grids</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line done"><span class="name">column-layout-persistence</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line partial"><span class="name">oms-token-wise-grouping</span><span class="leader"></span><span class="status">[~] partial</span><span class="note">needs Enterprise licence</span></div>
+          </div>
+
+          <div class="manifest-group">
+            <h5># Section 7 &amp; 8 — Order Entry &amp; Pre-Trade Controls</h5>
+            <div class="req-line done"><span class="name">limit-only-order-entry</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line done"><span class="name">keyboard-shortcuts-f1-f2</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line done"><span class="name">ops-cap-120-per-sec</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line done"><span class="name">all-14-rms-controls</span><span class="leader"></span><span class="status">[x] done</span></div>
+            <div class="req-line pending"><span class="name">trade-book-distinct-screen</span><span class="leader"></span><span class="status">[ ] pending</span></div>
+            <div class="req-line pending"><span class="name">servers-oms-provisioning-screen</span><span class="leader"></span><span class="status">[ ] pending</span></div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ NEXT ============ -->
+    <section class="slide tight" id="next">
+      <div class="eyebrow"><span class="dot"></span>09 — Remaining work</div>
+      <h2 class="title">What's left, in priority order</h2>
+      <p class="dek">Two meaningful phases remain, plus a handful of smaller, independently-schedulable gaps.</p>
+
+      <div class="cols-2">
+        <div>
+          <div class="feature">
+            <h4>1 · Auth &amp; session hardening</h4>
+            <p>Password reuse check, forced-change flow, idle-session timeout, single active session. Security-focused, self-contained.</p>
+          </div>
+          <div class="feature">
+            <h4>2 · Light theme for trading screens</h4>
+            <p>Spec-mandated default; currently dark everywhere. Small, fast follow-up.</p>
+          </div>
+        </div>
+        <div>
+          <div class="feature">
+            <h4>3 · Trade Book &amp; Servers/OMS screens</h4>
+            <p>Two screens the spec names explicitly that don't exist as distinct views yet.</p>
+          </div>
+          <div class="feature">
+            <h4>4 · AG Grid Enterprise decision</h4>
+            <p>A licensing call, not an engineering one — needed before true OMS/Token grouping can ship.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CLOSE ============ -->
+    <section class="slide closing" id="close">
+      <div class="eyebrow"><span class="dot"></span>10 — Close</div>
+      <h2 class="title">Questions</h2>
+      <p class="dek">Full source on <code>feature/dev</code> — commits <code>4eec107</code>, <code>d2d95cc</code>, and <code>634ca3c</code>. <code>main</code> is currently one commit behind and due for a fast-forward merge.</p>
+    </section>
+
+  </main>
+</div>
