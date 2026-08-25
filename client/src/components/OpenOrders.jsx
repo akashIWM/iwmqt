@@ -57,12 +57,19 @@ export default function OpenOrders() {
       cellStyle: (p) => ({ color: p.value === 'BUY' ? '#4ade80' : '#f87171', fontWeight: '700' }) 
     },
     { field: 'quantity', headerName: 'QTY', width: 75, cellStyle: { color: '#38bdf8' } },
-    { 
-      field: 'price', 
-      headerName: 'PRICE', 
-      width: 85, 
+    {
+      field: 'price',
+      headerName: 'PRICE',
+      width: 85,
       valueFormatter: (p) => p.value ? `₹${p.value}` : 'MKT',
-      cellStyle: { color: '#facc15' } 
+      cellStyle: { color: '#facc15' }
+    },
+    {
+      field: 'expiry',
+      headerName: 'EXPIRY',
+      width: 90,
+      valueFormatter: (p) => p.value || '—',
+      cellStyle: { color: '#94a3b8' }
     },
     {
       headerName: 'ACTION',

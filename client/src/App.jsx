@@ -10,6 +10,8 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const CompleteFirstLogin = lazy(() => import('./pages/CompleteFirstLogin'));
+const ChangePassword = lazy(() => import('./pages/ChangePassword'));
 const AdminPortal = lazy(() => import('./pages/AdminPortal'));
 const TraderShell = lazy(() => import('./pages/shells/TraderShell'));
 const RMSAdminShell = lazy(() => import('./pages/shells/RMSAdminShell'));
@@ -32,6 +34,8 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/first-login" element={<CompleteFirstLogin />} />
+            <Route path="/change-password" element={<ChangePassword />} />
 
             {/* Protected Routes by Role */}
             <Route

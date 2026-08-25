@@ -17,17 +17,36 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isHovered, setIsHovered] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Single shared login form for all five roles — role is resolved server-side from the credential, not chosen by the user[cite: 1].
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const attemptLogin = async (forceLogin) => {
     setError('');
     try {
-      const user = await login({ userId, password });
-      navigate(ROLE_ROUTES[user.role]);
+      const result = await login({ userId, password, forceLogin });
+      if (result.mustChangePassword) {
+        navigate('/first-login', { state: { userId: result.userId, currentPassword: password } });
+      } else {
+        navigate(ROLE_ROUTES[result.user.role]);
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Invalid credentials');
+      const data = err.response?.data;
+      // Single active session per user - the server rejects a second concurrent login
+      // with this specific error code so we can offer a "force sign-in" prompt instead
+      // of just failing outright.
+      if (data?.error === 'session_already_active') {
+        if (window.confirm(`${data.message}\n\nForce sign-in here?`)) {
+          attemptLogin(true);
+        }
+        return;
+      }
+      setError(data?.error || 'Invalid credentials');
     }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    attemptLogin(false);
   };
 
   // --- STYLES ---
@@ -112,6 +131,20 @@ export default function Login() {
       fontWeight: '500',
       textAlign: 'center'
     },
+    passwordWrapper: { position: 'relative' },
+    toggleBtn: {
+      position: 'absolute',
+      right: '12px',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      background: 'none',
+      border: 'none',
+      color: '#245a9e',
+      fontSize: '12px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      padding: '0'
+    },
     footerLinks: {
       marginTop: '24px',
       display: 'flex',
@@ -150,14 +183,19 @@ export default function Login() {
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>Password</label>
-            <input 
-              type="password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              required 
-              style={styles.input} 
-              placeholder="••••••••"
-            />
+            <div style={styles.passwordWrapper}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                style={{ ...styles.input, paddingRight: '60px' }}
+                placeholder="••••••••"
+              />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} style={styles.toggleBtn}>
+                {showPassword ? 'HIDE' : 'SHOW'}
+              </button>
+            </div>
           </div>
 
           <button 

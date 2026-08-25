@@ -29,6 +29,14 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     const { data } = await axios.post('/auth/login', credentials);
+    if (data.user) setUser(data.user);
+    return data;
+  };
+
+  // Completes the forced password-change gate login() returns when mustChangePassword
+  // is true (first login on a temp password, or an admin-initiated credential reset).
+  const completeFirstLogin = async (payload) => {
+    const { data } = await axios.post('/auth/complete-first-login', payload);
     setUser(data.user);
     return data.user;
   };
@@ -39,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, completeFirstLogin, logout, loading, refreshUser: fetchMe }}>
       {children}
     </AuthContext.Provider>
   );

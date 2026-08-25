@@ -128,7 +128,7 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-  const { userId, password } = req.body;
+  const { userId, password, forceLogin } = req.body;
   const ip = req.ip;
   const ua = req.headers['user-agent'];
 
@@ -167,6 +167,7 @@ export const login = async (req, res) => {
       if (attempts >= MAX_FAILED_ATTEMPTS) {
         status = 'LOCKED';
         await query('UPDATE users SET failed_login_attempts = $1, status = $2, locked_at = NOW() WHERE id = $3', [attempts, status, user.id]);
+        await logAuthEvent({ event_type: 'LOCKOUT', user_id: userId, success: false, ip_address: ip, user_agent: ua, metadata: `${attempts} consecutive failed attempts` });
       } else {
         await query('UPDATE users SET failed_login_attempts = $1 WHERE id = $2', [attempts, user.id]);
       }
@@ -177,8 +178,28 @@ export const login = async (req, res) => {
 
     await query('UPDATE users SET failed_login_attempts = 0, last_login_at = NOW() WHERE id = $1', [user.id]);
 
+    // First login on a temp password, or an admin-forced credential reset - the caller
+    // must set their own password before a real session is issued.
+    if (user.must_change_password) {
+      await logAuthEvent({ event_type: 'LOGIN_SUCCESS', user_id: userId, role: user.role, company_id: user.company_id, success: true, ip_address: ip, user_agent: ua, metadata: 'must_change_password pending' });
+      return res.status(200).json({ mustChangePassword: true, userId: user.user_id });
+    }
+
+    // Single active session per user - a second login attempt is rejected with a prompt
+    // unless the caller explicitly forces it (which supersedes/kills the older session).
+    if (user.active_session_id && !forceLogin) {
+      await logAuthEvent({ event_type: 'LOGIN_FAILURE', user_id: userId, success: false, ip_address: ip, user_agent: ua, metadata: 'session already active' });
+      return res.status(409).json({
+        error: 'session_already_active',
+        message: 'This account is already logged in elsewhere. Force sign-in to end that session and continue here.'
+      });
+    }
+
+    const sid = crypto.randomUUID();
+    await query('UPDATE users SET active_session_id = $1 WHERE id = $2', [sid, user.id]);
+
     const token = jwt.sign(
-      { id: user.id, userId: user.user_id, role: user.role, companyId: user.company_id },
+      { id: user.id, userId: user.user_id, role: user.role, companyId: user.company_id, sid },
       getJwtSecret(),
       { expiresIn: '12h' }
     );
@@ -195,9 +216,125 @@ export const login = async (req, res) => {
     res.json({
       user: {
         id: user.id, userId: user.user_id, fullName: user.full_name,
+        email: user.email, role: user.role, companyId: user.company_id, status: user.status,
+        passwordExpiresAt: user.password_expires_at
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Completes the forced password-change gate from login() (temp password on first login,
+// or an admin-initiated credential reset) - verifies the temp password one more time,
+// enforces the same complexity/reuse rules as a normal reset, then issues a real session.
+export const completeFirstLogin = async (req, res) => {
+  const { userId, currentPassword, newPassword, confirmPassword } = req.body;
+  const ip = req.ip;
+  const ua = req.headers['user-agent'];
+
+  if (newPassword !== confirmPassword) return res.status(400).json({ error: 'Passwords do not match' });
+  if (!validatePasswordComplexity(newPassword)) return res.status(400).json({ error: 'Password does not meet complexity requirements' });
+
+  try {
+    const result = await query('SELECT * FROM users WHERE user_id = $1', [userId]);
+    const user = result.rows[0];
+
+    if (!user || !user.must_change_password) {
+      return res.status(400).json({ error: 'No pending password change for this account' });
+    }
+
+    const validCurrent = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!validCurrent) return res.status(401).json({ error: 'Invalid credentials' });
+
+    if (await bcrypt.compare(newPassword, user.password_hash)) {
+      return res.status(400).json({ error: 'New password must differ from your current password' });
+    }
+    if (user.previous_password_hash && await bcrypt.compare(newPassword, user.previous_password_hash)) {
+      return res.status(400).json({ error: 'New password must differ from your previous password' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await query(
+      `UPDATE users SET
+         password_hash = $1, previous_password_hash = $2, must_change_password = false,
+         password_changed_at = NOW(), password_expires_at = NOW() + INTERVAL '15 days',
+         failed_login_attempts = 0, last_login_at = NOW(), updated_at = NOW()
+       WHERE id = $3`,
+      [passwordHash, user.password_hash, user.id]
+    );
+
+    const sid = crypto.randomUUID();
+    await query('UPDATE users SET active_session_id = $1 WHERE id = $2', [sid, user.id]);
+
+    const token = jwt.sign(
+      { id: user.id, userId: user.user_id, role: user.role, companyId: user.company_id, sid },
+      getJwtSecret(),
+      { expiresIn: '12h' }
+    );
+
+    await logAuthEvent({ event_type: 'PASSWORD_RESET', user_id: userId, role: user.role, company_id: user.company_id, success: true, ip_address: ip, user_agent: ua, metadata: 'first-login password change completed' });
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 12 * 60 * 60 * 1000
+    });
+
+    res.json({
+      user: {
+        id: user.id, userId: user.user_id, fullName: user.full_name,
         email: user.email, role: user.role, companyId: user.company_id, status: user.status
       }
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Self-service change-password for an already-authenticated user (e.g. the expiry
+// banner's "Change Now" action) - distinct from resetPassword (email-OTP, logged out)
+// and completeFirstLogin (temp-password gate before a session even exists).
+export const changePassword = async (req, res) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+
+  if (newPassword !== confirmPassword) return res.status(400).json({ error: 'Passwords do not match' });
+  if (!validatePasswordComplexity(newPassword)) return res.status(400).json({ error: 'Password does not meet complexity requirements' });
+
+  try {
+    const result = await query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    const user = result.rows[0];
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const validCurrent = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!validCurrent) return res.status(401).json({ error: 'Current password is incorrect' });
+
+    if (await bcrypt.compare(newPassword, user.password_hash)) {
+      return res.status(400).json({ error: 'New password must differ from your current password' });
+    }
+    if (user.previous_password_hash && await bcrypt.compare(newPassword, user.previous_password_hash)) {
+      return res.status(400).json({ error: 'New password must differ from your previous password' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await query(
+      `UPDATE users SET
+         password_hash = $1, previous_password_hash = $2,
+         password_changed_at = NOW(), password_expires_at = NOW() + INTERVAL '15 days',
+         updated_at = NOW()
+       WHERE id = $3`,
+      [passwordHash, user.password_hash, user.id]
+    );
+
+    await logAuthEvent({
+      event_type: 'PASSWORD_RESET', user_id: user.user_id, role: user.role, company_id: user.company_id,
+      success: true, ip_address: req.ip, user_agent: req.headers['user-agent'], metadata: 'self-service change'
+    });
+
+    res.status(200).json({ message: 'Password changed successfully' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -209,19 +346,33 @@ export const logout = async (req, res) => {
   if (token) {
     try {
       const decoded = jwt.verify(token, getJwtSecret());
+      // Only clear the session if this token's sid still owns it - a stale/already-
+      // superseded logout call must not wipe out a newer legitimate session.
+      if (decoded.sid) {
+        await query('UPDATE users SET active_session_id = NULL WHERE id = $1 AND active_session_id = $2', [decoded.id, decoded.sid]);
+      }
       await logAuthEvent({ event_type: 'LOGOUT', user_id: decoded.userId, role: decoded.role, company_id: decoded.companyId, success: true, ip_address: req.ip, user_agent: req.headers['user-agent'] });
     } catch (e) { /* Ignore invalid token during logout */ }
   }
-  
+
   res.clearCookie('token');
   res.status(200).json({ message: 'Logged out successfully' });
 };
 
 export const getMe = async (req, res) => {
   try {
-    const result = await query('SELECT id, user_id, full_name, email, role, company_id, status FROM users WHERE id = $1', [req.user.id]);
+    const result = await query(
+      'SELECT id, user_id, full_name, email, role, company_id, status, password_expires_at FROM users WHERE id = $1',
+      [req.user.id]
+    );
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
-    res.json({ user: result.rows[0] });
+    const row = result.rows[0];
+    res.json({
+      user: {
+        id: row.id, userId: row.user_id, fullName: row.full_name, email: row.email,
+        role: row.role, companyId: row.company_id, status: row.status, passwordExpiresAt: row.password_expires_at
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -290,10 +441,31 @@ export const resetPassword = async (req, res) => {
     if (otp_code !== otp) return res.status(400).json({ error: 'Invalid verification code' });
     if (new Date() > new Date(expires_at)) return res.status(400).json({ error: 'Verification code has expired.' });
 
-    // Hash new password and update user
+    const userResult = await query('SELECT id, password_hash, previous_password_hash FROM users WHERE email = $1', [email]);
+    const user = userResult.rows[0];
+    if (!user) return res.status(404).json({ error: 'No account found for this email' });
+
+    if (await bcrypt.compare(newPassword, user.password_hash)) {
+      return res.status(400).json({ error: 'New password must differ from your current password' });
+    }
+    if (user.previous_password_hash && await bcrypt.compare(newPassword, user.previous_password_hash)) {
+      return res.status(400).json({ error: 'New password must differ from your previous password' });
+    }
+
+    // Hash new password and update user - a self-service reset also clears any lockout,
+    // since it's one of the two spec-sanctioned recovery paths (the other being admin reset).
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    
-    await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE email = $2', [passwordHash, email]);
+
+    await query(
+      `UPDATE users SET
+         password_hash = $1, previous_password_hash = $2, must_change_password = false,
+         status = CASE WHEN status = 'LOCKED' THEN 'ACTIVE' ELSE status END,
+         failed_login_attempts = 0, locked_at = NULL,
+         password_changed_at = NOW(), password_expires_at = NOW() + INTERVAL '15 days',
+         updated_at = NOW()
+       WHERE id = $3`,
+      [passwordHash, user.password_hash, user.id]
+    );
     await query('DELETE FROM otp_verifications WHERE email = $1', [email]);
 
     await logAuthEvent({

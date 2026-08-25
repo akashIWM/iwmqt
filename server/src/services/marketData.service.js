@@ -1,11 +1,14 @@
+import { matchPendingOrders } from './executionEngine.service.js';
+
 // Initial Mock Ticker Master
+// expiry: weekly for index options (nearest Thursday), monthly for stock futures (last Thursday).
 const INITIAL_INSTRUMENTS = [
-  { symbol: 'NIFTY 24500 CE', ltp: 142.50, prevClose: 130.00, high: 165.00, low: 110.00, volume: 1254000, bid: 142.30, ask: 142.60 },
-  { symbol: 'NIFTY 24500 PE', ltp: 88.20, prevClose: 95.00, high: 105.00, low: 72.50, volume: 980000, bid: 88.05, ask: 88.35 },
-  { symbol: 'BANKNIFTY 52000 CE', ltp: 310.75, prevClose: 290.00, high: 360.00, low: 275.00, volume: 640000, bid: 310.25, ask: 311.00 },
-  { symbol: 'BANKNIFTY 52000 PE', ltp: 195.40, prevClose: 215.00, high: 230.00, low: 180.00, volume: 520000, bid: 195.10, ask: 195.70 },
-  { symbol: 'RELIANCE FUT', ltp: 2985.00, prevClose: 2970.00, high: 3010.00, low: 2965.00, volume: 340000, bid: 2984.50, ask: 2985.50 },
-  { symbol: 'HDFCBANK FUT', ltp: 1640.50, prevClose: 1655.00, high: 1662.00, low: 1638.00, volume: 410000, bid: 1640.10, ask: 1640.80 }
+  { symbol: 'NIFTY 24500 CE', ltp: 142.50, prevClose: 130.00, high: 165.00, low: 110.00, volume: 1254000, bid: 142.30, ask: 142.60, expiry: '2026-08-27' },
+  { symbol: 'NIFTY 24500 PE', ltp: 88.20, prevClose: 95.00, high: 105.00, low: 72.50, volume: 980000, bid: 88.05, ask: 88.35, expiry: '2026-08-27' },
+  { symbol: 'BANKNIFTY 52000 CE', ltp: 310.75, prevClose: 290.00, high: 360.00, low: 275.00, volume: 640000, bid: 310.25, ask: 311.00, expiry: '2026-08-27' },
+  { symbol: 'BANKNIFTY 52000 PE', ltp: 195.40, prevClose: 215.00, high: 230.00, low: 180.00, volume: 520000, bid: 195.10, ask: 195.70, expiry: '2026-08-27' },
+  { symbol: 'RELIANCE FUT', ltp: 2985.00, prevClose: 2970.00, high: 3010.00, low: 2965.00, volume: 340000, bid: 2984.50, ask: 2985.50, expiry: '2026-09-24' },
+  { symbol: 'HDFCBANK FUT', ltp: 1640.50, prevClose: 1655.00, high: 1662.00, low: 1638.00, volume: 410000, bid: 1640.10, ask: 1640.80, expiry: '2026-09-24' }
 ];
 
 let marketState = [...INITIAL_INSTRUMENTS];
@@ -18,10 +21,19 @@ export const getLtp = (symbol) => {
   return instrument ? instrument.ltp : null;
 };
 
+// Contract expiry date for a symbol, same "null if unknown" contract as getLtp.
+export const getExpiry = (symbol) => {
+  const instrument = marketState.find((inst) => inst.symbol === symbol);
+  return instrument ? instrument.expiry : null;
+};
+
 const tickInstrument = (inst) => {
   const volatility = inst.ltp * 0.0015; // 0.15% max tick delta
-  const change = (Math.random() - 0.49) * volatility;
-  const newLtp = parseFloat((inst.ltp + change).toFixed(2));
+  const noise = (Math.random() - 0.5) * volatility;
+  // Pull a fraction of the gap to prevClose back each tick, so LTP wanders around
+  // prevClose instead of drifting away unboundedly over a long-running process.
+  const reversion = (inst.prevClose - inst.ltp) * 0.02;
+  const newLtp = parseFloat((inst.ltp + noise + reversion).toFixed(2));
   const priceDiff = newLtp - inst.prevClose;
   const pChange = parseFloat(((priceDiff / inst.prevClose) * 100).toFixed(2));
 
@@ -67,6 +79,11 @@ export const initMarketDataSocket = (wss) => {
       if (client.readyState === 1) { // WebSocket.OPEN
         client.send(payload);
       }
+    });
+
+    // Run matching after the broadcast so a slow DB never delays the market data feed.
+    Promise.all(changes.map((inst) => matchPendingOrders(inst.symbol, inst.ltp))).catch((error) => {
+      console.error('Execution engine - failed to match pending orders:', error.message);
     });
   }, 600);
 

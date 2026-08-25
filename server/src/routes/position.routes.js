@@ -1,6 +1,7 @@
 import express from 'express';
-import { query } from '../db/postgres.js'; 
+import { query } from '../db/postgres.js';
 import { authenticate } from '../middleware/auth.middleware.js';
+import { getLtp, getExpiry } from '../services/marketData.service.js';
 
 const router = express.Router();
 
@@ -34,7 +35,16 @@ router.get('/', authenticate, async (req, res) => {
           [userId]
         );
 
-    res.status(200).json({ positions: positionsQuery.rows });
+    // Mark-to-market against the live mock LTP; null when the symbol has no live quote.
+    const positions = positionsQuery.rows.map((row) => {
+      const ltp = getLtp(row.symbol);
+      const netQty = Number(row.net_qty);
+      const avgPrice = Number(row.avg_price);
+      const pnl = ltp !== null ? (ltp - avgPrice) * netQty : null;
+      return { ...row, ltp, pnl, expiry: getExpiry(row.symbol) };
+    });
+
+    res.status(200).json({ positions });
   } catch (error) {
     console.error('Positions Error:', error);
     res.status(500).json({ message: 'Internal server error fetching positions' });

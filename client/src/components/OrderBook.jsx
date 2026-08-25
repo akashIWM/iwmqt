@@ -51,6 +51,7 @@ export default function OrderBook() {
     },
     { field: 'quantity', headerName: 'QTY', width: 60, cellStyle: { color: '#f8fafc' } },
     { field: 'price', headerName: 'PRICE', width: 75, valueFormatter: (p) => p.value ? `₹${Number(p.value).toFixed(2)}` : 'MKT', cellStyle: { color: '#38bdf8' } },
+    { field: 'expiry', headerName: 'EXPIRY', width: 90, valueFormatter: (p) => p.value || '—', cellStyle: { color: '#94a3b8' } },
     {
       field: 'status',
       headerName: 'STATUS',
