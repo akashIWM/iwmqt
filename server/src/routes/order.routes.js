@@ -1,8 +1,8 @@
 import express from 'express';
 import { query } from '../db/postgres.js';
-import { authenticate } from '../middleware/auth.middleware.js';
+import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { validateOrder } from '../utils/validators.js';
-import { getLtp } from '../services/marketData.service.js';
+import { getLtp, getExpiry } from '../services/marketData.service.js';
 import { opsRateLimit } from '../middleware/opsRateLimit.middleware.js';
 
 const router = express.Router();
@@ -18,7 +18,9 @@ router.get('/', authenticate, async (req, res) => {
       ? await query(`SELECT * FROM orders ORDER BY created_at DESC LIMIT 200`)
       : await query(`SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC`, [userId]);
 
-    res.status(200).json({ orders: userOrders.rows });
+    const orders = userOrders.rows.map((row) => ({ ...row, expiry: getExpiry(row.symbol) }));
+
+    res.status(200).json({ orders });
   } catch (error) {
     console.error('Fetch Orders Error:', error);
     res.status(500).json({ message: 'Internal server error fetching orders' });
@@ -26,7 +28,8 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // POST /api/orders/place
-router.post('/place', authenticate, opsRateLimit, async (req, res) => {
+// Spec: order entry is Trader-only - RMS Admin/PM/Company Account/Super Admin must not be able to place orders.
+router.post('/place', authenticate, authorize('TRADER'), opsRateLimit, async (req, res) => {
   try {
     const { symbol, side, type, quantity, price } = req.body;
     const userId = req.user.userId || req.user.id;
@@ -219,7 +222,7 @@ router.post('/place', authenticate, opsRateLimit, async (req, res) => {
 });
 
 // PUT /api/orders/:id/cancel - Cancel a pending order
-router.put('/:id/cancel', authenticate, async (req, res) => {
+router.put('/:id/cancel', authenticate, authorize('TRADER'), async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.userId || req.user.id;

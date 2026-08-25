@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../db/postgres.js';
-import { getAllUsers, createUser, updateUserRole, updateUserStatus } from '../controllers/admin.controller.js';
+import { getAllUsers, createUser, updateUserRole, updateUserStatus, resetUserPassword } from '../controllers/admin.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
@@ -36,5 +36,6 @@ router.get('/users', getAllUsers);
 router.post('/users', authorize('SUPER_ADMIN', 'COMPANY_ACCOUNT'), createUser);
 router.put('/users/:id/role', updateUserRole);
 router.put('/users/:id/status', updateUserStatus);
+router.post('/users/:id/reset-password', resetUserPassword);
 
 export default router;

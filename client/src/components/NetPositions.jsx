@@ -54,10 +54,25 @@ export default function NetPositions() {
       cellStyle: { color: '#38bdf8' }
     },
     {
-      headerName: 'P&L',
+      field: 'expiry',
+      headerName: 'EXPIRY',
       width: 90,
-      valueGetter: () => '₹0.00', // Mock P&L placeholder until live LTP ticks are hooked up
-      cellStyle: { color: '#facc15', fontWeight: '700' }
+      valueFormatter: (p) => p.value || '—',
+      cellStyle: { color: '#94a3b8' }
+    },
+    {
+      field: 'ltp',
+      headerName: 'LTP',
+      width: 90,
+      valueFormatter: (p) => (p.value != null ? `₹${Number(p.value).toFixed(2)}` : '—'),
+      cellStyle: { color: '#38bdf8' }
+    },
+    {
+      field: 'pnl',
+      headerName: 'P&L',
+      width: 100,
+      valueFormatter: (p) => (p.value != null ? `₹${Number(p.value).toFixed(2)}` : '—'),
+      cellStyle: (p) => ({ color: p.value > 0 ? '#4ade80' : p.value < 0 ? '#f87171' : '#facc15', fontWeight: '700' })
     }
   ]);
 
