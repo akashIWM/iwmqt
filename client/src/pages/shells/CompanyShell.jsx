@@ -21,13 +21,14 @@ export default function CompanyShell() {
 
         <div style={styles.grid}>
           <AccessModule title="User & Role Management" scope="✔ Own Entity" onClick={() => navigate('/app/admin?tab=users')} />
-          <AccessModule title="Server / OMS Config" scope="✔ Entity Scope" onClick={() => navigate('/app/admin?tab=oms-config')} />
+          <AccessModule title="Server / OMS Configuration" scope="✔ Entity Scope" onClick={() => navigate('/app/admin?tab=servers')} />
           <AccessModule title="Security-Wise Limits" scope="✔ Entity Scope" onClick={() => navigate('/app/admin?tab=security-limits')} />
           <AccessModule title="Kill Switch" scope="✔ Entity-wide" onClick={() => navigate('/app/admin?tab=kill-switch')} />
           <AccessModule title="Audit Log" scope="✔ Entity-wide" onClick={() => navigate('/app/admin?tab=audit-log')} />
           <AccessModule title="Order Book & Trade Book" scope="View (Entity)" onClick={() => navigate('/app/admin?tab=orders')} />
           <AccessModule title="Net Positions" scope="View (Entity)" onClick={() => navigate('/app/admin?tab=positions')} />
-          <AccessModule title="RMS Dashboard" scope="View-Only" onClick={() => navigate('/app/admin')} />
+          <AccessModule title="RMS Dashboard (Stats)" scope="View-Only" onClick={() => navigate('/app/admin')} />
+          <AccessModule title="RMS Risk Limits (14 Controls)" scope="View-Only" onClick={() => navigate('/app/admin?tab=oms-config')} />
           <AccessModule title="Watchlist & BanScript" scope="View-Only" onClick={() => navigate('/app/admin?tab=watchlist')} />
         </div>
       </main>

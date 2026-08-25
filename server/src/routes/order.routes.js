@@ -2,7 +2,7 @@ import express from 'express';
 import { query } from '../db/postgres.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { validateOrder } from '../utils/validators.js';
-import { getLtp, getExpiry } from '../services/marketData.service.js';
+import { getLtp, getExpiry, getToken } from '../services/marketData.service.js';
 import { opsRateLimit } from '../middleware/opsRateLimit.middleware.js';
 
 const router = express.Router();
@@ -15,15 +15,41 @@ router.get('/', authenticate, async (req, res) => {
     const userId = req.user.userId || req.user.id;
 
     const userOrders = isRmsRole(req.user.role)
-      ? await query(`SELECT * FROM orders ORDER BY created_at DESC LIMIT 200`)
-      : await query(`SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC`, [userId]);
+      ? await query(
+          `SELECT o.*, u.pan, u.nnf_id, u.neat_id FROM orders o
+           JOIN users u ON u.user_id = o.user_id
+           ORDER BY o.created_at DESC LIMIT 200`
+        )
+      : await query(
+          `SELECT o.*, u.pan, u.nnf_id, u.neat_id FROM orders o
+           JOIN users u ON u.user_id = o.user_id
+           WHERE o.user_id = $1 ORDER BY o.created_at DESC`,
+          [userId]
+        );
 
-    const orders = userOrders.rows.map((row) => ({ ...row, expiry: getExpiry(row.symbol) }));
+    const orders = userOrders.rows.map((row) => ({ ...row, expiry: getExpiry(row.symbol), token: getToken(row.symbol) }));
 
     res.status(200).json({ orders });
   } catch (error) {
     console.error('Fetch Orders Error:', error);
     res.status(500).json({ message: 'Internal server error fetching orders' });
+  }
+});
+
+// GET /api/orders/events - rolling buffer of order lifecycle events (Order Logs grid).
+// Same visibility split as GET / : RMS/Super Admin see everyone's, everyone else sees own.
+router.get('/events', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+
+    const events = isRmsRole(req.user.role)
+      ? await query(`SELECT * FROM order_events ORDER BY created_at DESC LIMIT 200`)
+      : await query(`SELECT * FROM order_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT 200`, [userId]);
+
+    res.status(200).json({ events: events.rows });
+  } catch (error) {
+    console.error('Fetch Order Events Error:', error);
+    res.status(500).json({ message: 'Internal server error fetching order events' });
   }
 });
 
@@ -205,10 +231,20 @@ router.post('/place', authenticate, authorize('TRADER'), opsRateLimit, async (re
     }
     // --- END RMS CHECKS ---
 
+    // Mock exchange-facing order id - no real exchange connectivity yet, but Order Book
+    // needs to show both an internal id and an "exchange" one per the GUI spec.
+    const exchangeOrderId = `NSE${Math.floor(100000 + Math.random() * 900000)}`;
+
     const newOrder = await query(
-      `INSERT INTO orders (user_id, symbol, side, type, quantity, price, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING') RETURNING *`,
-      [userId, normalizedSymbol, side, type, quantity, price]
+      `INSERT INTO orders (user_id, symbol, side, type, quantity, price, status, exchange_order_id)
+       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7) RETURNING *`,
+      [userId, normalizedSymbol, side, type, quantity, price, exchangeOrderId]
+    );
+
+    await query(
+      `INSERT INTO order_events (order_id, user_id, symbol, order_type, quantity, price, event)
+       VALUES ($1, $2, $3, $4, $5, $6, 'PLACED')`,
+      [newOrder.rows[0].id, userId, normalizedSymbol, type, quantity, price]
     );
 
     res.status(201).json({
@@ -236,7 +272,14 @@ router.put('/:id/cancel', authenticate, authorize('TRADER'), async (req, res) =>
       return res.status(404).json({ message: 'Order not found or cannot be cancelled (already executed/cancelled)' });
     }
 
-    res.status(200).json({ message: 'Order cancelled successfully', order: result.rows[0] });
+    const cancelled = result.rows[0];
+    await query(
+      `INSERT INTO order_events (order_id, user_id, symbol, order_type, quantity, price, event)
+       VALUES ($1, $2, $3, $4, $5, $6, 'CANCELLED')`,
+      [cancelled.id, cancelled.user_id, cancelled.symbol, cancelled.type, cancelled.quantity, cancelled.price]
+    );
+
+    res.status(200).json({ message: 'Order cancelled successfully', order: cancelled });
   } catch (error) {
     console.error('Cancel Order Error:', error);
     res.status(500).json({ message: 'Internal server error cancelling order' });

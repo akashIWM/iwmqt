@@ -70,11 +70,12 @@ export default function SuperAdminShell() {
         <div style={styles.grid}>
           <AccessModule title="Company Account Management" scope="✔ Full Access" onClick={() => navigate('/app/admin?tab=company-accounts')} />
           <AccessModule title="User & Role Management" scope="✔ Global" onClick={() => navigate('/app/admin?tab=users')} />
-          <AccessModule title="Server / OMS Config" scope="✔ Global" onClick={() => navigate('/app/admin?tab=oms-config')} />
+          <AccessModule title="Server / OMS Configuration" scope="✔ Global" onClick={() => navigate('/app/admin?tab=servers')} />
           <AccessModule title="Security-Wise Limits" scope="✔ Global" onClick={() => navigate('/app/admin?tab=security-limits')} />
           <AccessModule title="Kill Switch" scope="✔ Platform-wide" onClick={() => navigate('/app/admin?tab=kill-switch')} />
           <AccessModule title="Audit Log" scope="✔ Platform-wide" onClick={() => navigate('/app/admin?tab=audit-log')} />
-          <AccessModule title="RMS Dashboard" scope="View-Only" onClick={() => navigate('/app/admin')} />
+          <AccessModule title="RMS Dashboard (Stats)" scope="View-Only" onClick={() => navigate('/app/admin')} />
+          <AccessModule title="RMS Risk Limits (14 Controls)" scope="View-Only" onClick={() => navigate('/app/admin?tab=oms-config')} />
         </div>
 
         <hr style={{ margin: '32px 0', border: 'none', borderTop: '1px solid #d9e2ec' }} />

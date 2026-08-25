@@ -1,25 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { apiFetch } from '../../api';
+import { AgGridReact } from 'ag-grid-react';
+import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
+import { GRID_THEME_CLASS, GRID_THEME_CSS, gridColors } from '../../styles/gridTheme';
+
+ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
+
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 const styles = {
-  card: { backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px', border: '1px solid #334155', marginBottom: '20px', maxWidth: '600px' },
-  text: { color: '#94a3b8', fontSize: '13px', marginBottom: '16px' },
-  label: { display: 'block', fontSize: '12px', marginBottom: '5px', color: '#94a3b8' },
-  input: { width: '100%', padding: '10px', marginBottom: '12px', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#fff', boxSizing: 'border-box' },
-  btn: { padding: '10px 16px', backgroundColor: '#38bdf8', color: '#0f172a', border: 'none', borderRadius: '4px', fontWeight: '700', cursor: 'pointer' },
-  tempPassword: { backgroundColor: '#052e16', border: '1px solid #16a34a', color: '#4ade80', padding: '12px', borderRadius: '6px', fontSize: '13px', marginBottom: '16px', fontFamily: 'monospace' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '10px 12px', fontSize: '12px', color: '#94a3b8', borderBottom: '1px solid #334155' },
-  td: { padding: '10px 12px', fontSize: '13px', color: '#f8fafc', borderBottom: '1px solid #334155' },
-  badge: (active) => ({
-    padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700',
-    backgroundColor: active ? 'rgba(74, 222, 128, 0.15)' : 'rgba(248, 113, 113, 0.15)',
-    color: active ? '#4ade80' : '#f87171'
-  }),
-  actionBtn: (danger) => ({
-    padding: '6px 12px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '11px', color: '#fff',
-    backgroundColor: danger ? '#fa5252' : '#40c057'
-  })
+  card: { backgroundColor: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px', maxWidth: '600px' },
+  text: { color: gridColors.muted, fontSize: '13px', marginBottom: '16px' },
+  label: { display: 'block', fontSize: '12px', marginBottom: '5px', color: gridColors.muted },
+  input: { width: '100%', padding: '10px', marginBottom: '12px', borderRadius: '4px', border: '1px solid #d9e2ec', backgroundColor: '#f8f9fa', color: gridColors.primary, boxSizing: 'border-box' },
+  btn: { padding: '10px 16px', backgroundColor: gridColors.accent, color: '#fff', border: 'none', borderRadius: '4px', fontWeight: '700', cursor: 'pointer' },
+  tempPassword: { backgroundColor: '#ecfdf5', border: '1px solid #2b8a3e', color: '#1a5c2a', padding: '12px', borderRadius: '6px', fontSize: '13px', marginBottom: '16px', fontFamily: 'monospace' }
 };
 
 export default function CompanyAccountManagement() {
@@ -27,6 +23,7 @@ export default function CompanyAccountManagement() {
   const [form, setForm] = useState({ code: '', name: '', adminUserId: '', adminFullName: '', adminEmail: '' });
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const gridRef = useRef();
 
   useEffect(() => {
     fetchCompanies();
@@ -80,12 +77,44 @@ export default function CompanyAccountManagement() {
     }
   };
 
+  const [columnDefs] = useState([
+    { field: 'code', headerName: 'CODE', width: 120, cellStyle: { fontWeight: '700', color: gridColors.primary } },
+    { field: 'name', headerName: 'NAME', width: 200, cellStyle: { color: gridColors.primary } },
+    { field: 'member_count', headerName: 'MEMBERS', width: 100, cellStyle: { color: gridColors.primary } },
+    {
+      field: 'status', headerName: 'STATUS', width: 110,
+      cellStyle: (p) => ({ color: p.value === 'ACTIVE' ? gridColors.buy : gridColors.sell, fontWeight: '700' })
+    },
+    {
+      headerName: 'ACTION', width: 120,
+      cellRenderer: (params) => (
+        <button
+          onClick={() => toggleStatus(params.data.code, params.data.status)}
+          style={{ padding: '4px 10px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '11px', color: '#fff', backgroundColor: params.data.status === 'ACTIVE' ? gridColors.sell : gridColors.buy }}
+        >
+          {params.data.status === 'ACTIVE' ? 'Suspend' : 'Reactivate'}
+        </button>
+      )
+    }
+  ]);
+
+  const defaultColDef = useMemo(() => ({
+    sortable: true,
+    resizable: true,
+    cellStyle: { fontFamily: '"JetBrains Mono", monospace', fontSize: '12px', display: 'flex', alignItems: 'center' }
+  }), []);
+
+  const handleExportCsv = () => {
+    gridRef.current?.api?.exportDataAsCsv({ fileName: `companies-${Date.now()}.csv` });
+  };
+
   return (
     <div>
+      <style>{GRID_THEME_CSS}</style>
       <div style={styles.card}>
-        <h3 style={{ marginTop: 0 }}>New Company Account</h3>
+        <h3 style={{ marginTop: 0, color: gridColors.primary }}>New Company Account</h3>
         <p style={styles.text}>Creates the entity and its first Company Account login in one step.</p>
-        {error && <p style={{ color: '#f87171', fontSize: '13px' }}>{error}</p>}
+        {error && <p style={{ color: gridColors.sell, fontSize: '13px' }}>{error}</p>}
         {result && (
           <div style={styles.tempPassword}>
             Login <strong>{result.adminUser.user_id}</strong> created. One-time temp password: <strong>{result.tempPassword}</strong>
@@ -107,34 +136,25 @@ export default function CompanyAccountManagement() {
         </form>
       </div>
 
-      <div style={styles.card}>
-        <h3 style={{ marginTop: 0 }}>Companies</h3>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Code</th>
-              <th style={styles.th}>Name</th>
-              <th style={styles.th}>Members</th>
-              <th style={styles.th}>Status</th>
-              <th style={styles.th}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {companies.map((c) => (
-              <tr key={c.code}>
-                <td style={styles.td}><strong>{c.code}</strong></td>
-                <td style={styles.td}>{c.name}</td>
-                <td style={styles.td}>{c.member_count}</td>
-                <td style={styles.td}><span style={styles.badge(c.status === 'ACTIVE')}>{c.status}</span></td>
-                <td style={styles.td}>
-                  <button style={styles.actionBtn(c.status === 'ACTIVE')} onClick={() => toggleStatus(c.code, c.status)}>
-                    {c.status === 'ACTIVE' ? 'Suspend' : 'Reactivate'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ ...styles.card, maxWidth: 'none' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ margin: 0, color: gridColors.primary }}>Companies</h3>
+          <button onClick={handleExportCsv} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '700', backgroundColor: '#e2e8f0', color: gridColors.primary }}>
+            Export CSV
+          </button>
+        </div>
+        <div className={GRID_THEME_CLASS} style={{ height: '350px', width: '100%' }}>
+          <AgGridReact
+            ref={gridRef}
+            theme="legacy"
+            rowData={companies}
+            columnDefs={columnDefs}
+            defaultColDef={defaultColDef}
+            getRowId={(params) => params.data.code}
+            rowHeight={35}
+            headerHeight={35}
+          />
+        </div>
       </div>
     </div>
   );

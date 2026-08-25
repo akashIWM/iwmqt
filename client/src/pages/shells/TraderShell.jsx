@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Watchlist from '../../components/Watchlist';
 import OrderBook from '../../components/OrderBook';
+import TradeBook from '../../components/TradeBook';
 import TradeWindow from '../../components/TradeWindow';
 import NetPositions from '../../components/NetPositions';
 import BanScript from '../../components/BanScript';
@@ -17,6 +18,7 @@ export default function TraderShell() {
   const tabs = [
     { id: 'TradeWindow', label: 'Trade' },
     { id: 'OrderWindow', label: 'Order Book' },
+    { id: 'TradeBook', label: 'Trade Book' },
     { id: 'OpenOrders', label: 'Open Orders' },
     { id: 'NetPositions', label: 'Positions' },
     { id: 'BanScript', label: 'Ban Script' },
@@ -140,13 +142,14 @@ export default function TraderShell() {
               <div style={layoutStyles.panelContent}>
                 {activePanel === 'TradeWindow' && <TradeWindow />}
                 {activePanel === 'OrderWindow' && <OrderBook />}
+                {activePanel === 'TradeBook' && <TradeBook />}
                 {activePanel === 'OpenOrders' && <OpenOrders />}
                 {activePanel === 'NetPositions' && <NetPositions />}
                 {activePanel === 'BanScript' && <BanScript />}
                 {activePanel === 'Strategy' && <StrategyPanel />}
                 {activePanel === 'LogWindow' && <LogWindow />}
 
-                {!['TradeWindow', 'OrderWindow', 'NetPositions', 'BanScript'].includes(activePanel) && (
+                {!tabs.some((t) => t.id === activePanel) && (
                   <p style={{ color: '#627d98', fontSize: '14px' }}>
                     {activePanel} module is coming soon.
                   </p>

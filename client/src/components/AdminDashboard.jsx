@@ -5,6 +5,8 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ totalOrders: 0, totalUsers: 0, bannedScriptsCount: 0 });
   const [symbolToBan, setSymbolToBan] = useState('');
   const [reason, setReason] = useState('');
+  const [asmStage, setAsmStage] = useState('');
+  const [gsmStage, setGsmStage] = useState('');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -31,13 +33,15 @@ export default function AdminDashboard() {
       const response = await apiFetch('/rms/ban', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: symbolToBan.toUpperCase(), reason })
+        body: JSON.stringify({ symbol: symbolToBan.toUpperCase(), reason, asmStage, gsmStage })
       });
       const data = await response.json();
       if (response.ok) {
         setMessage(`Successfully restricted ${symbolToBan.toUpperCase()}`);
         setSymbolToBan('');
         setReason('');
+        setAsmStage('');
+        setGsmStage('');
         fetchAdminStats();
       } else {
         setMessage(`Error: ${data.message}`);
@@ -95,12 +99,28 @@ export default function AdminDashboard() {
             required 
           />
           <label style={{ display: 'block', fontSize: '12px', marginBottom: '5px', color: '#94a3b8' }}>REASON</label>
-          <input 
-            type="text" 
-            value={reason} 
-            onChange={(e) => setReason(e.target.value)} 
-            placeholder="e.g. Excessive Volatility / Circuit Hit" 
-            style={styles.input} 
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Excessive Volatility / Circuit Hit"
+            style={styles.input}
+          />
+          <label style={{ display: 'block', fontSize: '12px', marginBottom: '5px', color: '#94a3b8' }}>ASM STAGE (optional)</label>
+          <input
+            type="text"
+            value={asmStage}
+            onChange={(e) => setAsmStage(e.target.value)}
+            placeholder="e.g. Stage IV"
+            style={styles.input}
+          />
+          <label style={{ display: 'block', fontSize: '12px', marginBottom: '5px', color: '#94a3b8' }}>GSM STAGE (optional)</label>
+          <input
+            type="text"
+            value={gsmStage}
+            onChange={(e) => setGsmStage(e.target.value)}
+            placeholder="e.g. Stage II"
+            style={styles.input}
           />
           <button type="submit" style={styles.btn}>APPLY RMS BAN</button>
         </form>

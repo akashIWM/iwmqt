@@ -11,56 +11,52 @@ ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 
-// symbol alone is no longer unique once RMS/Super Admin see every trader's positions -
-// composite id keeps each (user, symbol) pair distinct.
-const getRowId = (row) => `${row.user_id}:${row.symbol}`;
+const getRowId = (row) => row.id;
 
-export default function NetPositions() {
-  const [positionCount, setPositionCount] = useState(0);
+// Trade Book (fills) per GUI spec 6.2 - separate from Order Book, EXECUTED orders only.
+// There's no separate fills table yet (an order fills 100% or not at all in this engine,
+// so today a "trade" and an "EXECUTED order" are the same row) - filtered client-side from
+// the same /orders payload, same pattern OpenOrders uses for its PENDING-only filter.
+export default function TradeBook() {
+  const [tradeCount, setTradeCount] = useState(0);
   const [groupBy, setGroupBy] = useState(null); // null | 'token' | 'oms'
   const gridRef = useRef();
-  const columnPersistence = useGridColumnPersistence('grid-columns:net-positions');
+  const columnPersistence = useGridColumnPersistence('grid-columns:trade-book');
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability
-    fetchPositions();
-    const interval = setInterval(fetchPositions, 3000);
+    fetchTrades();
+    const interval = setInterval(fetchTrades, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  async function fetchPositions() {
+  async function fetchTrades() {
     try {
-      const response = await apiFetch('/positions');
+      const response = await apiFetch('/orders');
       const data = await response.json();
       if (response.ok) {
-        syncGridRows(gridRef.current?.api, data.positions, getRowId);
-        setPositionCount(data.positions.length);
+        const executed = data.orders.filter((o) => o.status === 'EXECUTED');
+        syncGridRows(gridRef.current?.api, executed, getRowId);
+        setTradeCount(executed.length);
       }
     } catch (err) {
-      console.error('Failed to fetch positions:', err);
+      console.error('Failed to fetch trade book:', err);
     }
   }
 
   const [columnDefs] = useState([
     { field: 'user_id', headerName: 'OMS / TRADER', width: 110, cellStyle: { color: gridColors.muted } },
-    { field: 'symbol', headerName: 'INSTRUMENT', width: 140, cellStyle: { fontWeight: '700', color: gridColors.primary } },
+    { field: 'symbol', headerName: 'SCRIPT', width: 150, cellStyle: { fontWeight: '700', color: gridColors.primary } },
+    { field: 'token', headerName: 'TOKEN', width: 80, cellStyle: { color: gridColors.muted } },
     {
-      field: 'net_qty', headerName: 'NET QTY', width: 90, enableCellChangeFlash: true,
-      cellStyle: (p) => ({ color: Number(p.value) > 0 ? gridColors.buy : gridColors.sell, fontWeight: '700' })
+      field: 'side', headerName: 'SIDE', width: 70,
+      cellStyle: (p) => ({ color: p.value === 'BUY' ? gridColors.buy : gridColors.sell, fontWeight: '700' })
     },
+    { field: 'quantity', headerName: 'QTY', width: 80, cellStyle: { color: gridColors.primary } },
+    { field: 'price', headerName: 'PRICE', width: 90, valueFormatter: (p) => `₹${Number(p.value).toFixed(2)}`, cellStyle: { color: gridColors.price } },
     {
-      field: 'avg_price', headerName: 'AVG PRICE', width: 100, enableCellChangeFlash: true,
-      valueFormatter: (p) => `₹${Number(p.value).toFixed(2)}`, cellStyle: { color: gridColors.accent }
-    },
-    { field: 'expiry', headerName: 'EXPIRY', width: 90, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
-    {
-      field: 'ltp', headerName: 'LTP', width: 90, enableCellChangeFlash: true,
-      valueFormatter: (p) => (p.value != null ? `₹${Number(p.value).toFixed(2)}` : '—'), cellStyle: { color: gridColors.accent }
-    },
-    {
-      field: 'pnl', headerName: 'P&L', width: 100, enableCellChangeFlash: true,
-      valueFormatter: (p) => (p.value != null ? `₹${Number(p.value).toFixed(2)}` : '—'),
-      cellStyle: (p) => ({ color: p.value > 0 ? gridColors.buy : p.value < 0 ? gridColors.sell : gridColors.pending, fontWeight: '700' })
+      field: 'executed_at', headerName: 'TIME', width: 150,
+      valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleString() : '—'), cellStyle: { color: gridColors.muted, fontSize: '11px' }
     }
   ]);
 
@@ -71,17 +67,16 @@ export default function NetPositions() {
   }), []);
 
   const handleExportCsv = () => {
-    gridRef.current?.api?.exportDataAsCsv({ fileName: `net-positions-${Date.now()}.csv` });
+    gridRef.current?.api?.exportDataAsCsv({ fileName: `trade-book-${Date.now()}.csv` });
   };
 
-  // Community-tier stand-in for OMS-wise/Token-wise grouping (needs AG Grid Enterprise for
-  // real collapsible row groups) - segments rows via a plain sort instead.
+  // Community-tier stand-in for OMS-wise/Token-wise grouping, same pattern as Net Positions.
   const setGrouping = (mode) => {
     const next = groupBy === mode ? null : mode;
     setGroupBy(next);
-    const colId = next === 'oms' ? 'user_id' : next === 'token' ? 'symbol' : null;
+    const colId = next === 'oms' ? 'user_id' : next === 'token' ? 'token' : null;
     gridRef.current?.api?.applyColumnState({
-      state: colId ? [{ colId, sort: 'asc' }] : [{ colId: 'user_id', sort: null }, { colId: 'symbol', sort: null }]
+      state: colId ? [{ colId, sort: 'asc' }] : [{ colId: 'user_id', sort: null }, { colId: 'token', sort: null }]
     });
   };
 
@@ -95,14 +90,14 @@ export default function NetPositions() {
       <style>{GRID_THEME_CSS}</style>
 
       <div style={{ padding: '4px 0 12px 0', fontSize: '13px', color: gridColors.muted, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>Open Market Positions</span>
+        <span>Trade Book</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button onClick={() => setGrouping('oms')} style={groupBtnStyle(groupBy === 'oms')}>OMS-wise</button>
           <button onClick={() => setGrouping('token')} style={groupBtnStyle(groupBy === 'token')}>Token-wise</button>
           <button onClick={handleExportCsv} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '700', backgroundColor: '#e2e8f0', color: gridColors.primary }}>
             Export CSV
           </button>
-          <span>{positionCount} Active</span>
+          <span>{tradeCount} Trades</span>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import NetPositions from '../../components/NetPositions';
 import OrderBook from '../../components/OrderBook';
+import TradeBook from '../../components/TradeBook';
 import Watchlist from '../../components/Watchlist';
 import BanScript from '../../components/BanScript';
 import RmsStatsSummary from '../../components/admin/RmsStatsSummary';
@@ -16,7 +17,15 @@ export default function PMShell() {
 
   const modules = {
     positions: { label: 'Net Positions (Aggregated)', render: () => <NetPositions /> },
-    orders: { label: 'Order Book & Trade Book', render: () => <OrderBook /> },
+    orders: {
+      label: 'Order Book & Trade Book',
+      render: () => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <OrderBook />
+          <TradeBook />
+        </div>
+      )
+    },
     rms: { label: 'RMS Dashboard (View-Only)', render: () => <RmsStatsSummary /> },
     watchlist: { label: 'Watchlist', render: () => <Watchlist /> },
     banscript: { label: 'BanScript Alerts', render: () => <BanScript /> }

@@ -4,6 +4,7 @@ import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
 import { syncGridRows } from '../utils/gridSync';
 import { useGridColumnPersistence } from '../hooks/useGridColumnPersistence';
+import { GRID_THEME_CLASS, GRID_THEME_CSS, gridColors } from '../styles/gridTheme';
 
 ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
 
@@ -43,15 +44,24 @@ export default function BanScript() {
     }
   }
 
+  // Column set per GUI spec 6.2: Script, ASM stage, GSM stage, Alert flag - reason/banned_at
+  // kept as bonus context columns since they're real, useful RMS data the spec doesn't ask for.
   const [columnDefs] = useState([
-    { field: 'symbol', headerName: 'BANNED SCRIPT', width: 140, cellStyle: { fontWeight: '700', color: '#f87171' } },
-    { field: 'reason', headerName: 'RMS REASON', width: 150, cellStyle: { color: '#94a3b8' } },
+    { field: 'symbol', headerName: 'SCRIPT', width: 150, cellStyle: { fontWeight: '700', color: gridColors.sell } },
+    { field: 'asm_stage', headerName: 'ASM STAGE', width: 110, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
+    { field: 'gsm_stage', headerName: 'GSM STAGE', width: 110, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
+    {
+      headerName: 'ALERT FLAG', width: 100,
+      valueGetter: (p) => (p.data.asm_stage || p.data.gsm_stage ? 'YES' : 'NO'),
+      cellStyle: (p) => ({ color: p.value === 'YES' ? gridColors.sell : gridColors.muted, fontWeight: '700' })
+    },
+    { field: 'reason', headerName: 'RMS REASON', width: 170, cellStyle: { color: gridColors.muted } },
     {
       field: 'banned_at',
       headerName: 'TIME',
       width: 110,
-      valueFormatter: (p) => new Date(p.banned_at).toLocaleTimeString(),
-      cellStyle: { color: '#64748b', fontSize: '11px' }
+      valueFormatter: (p) => new Date(p.value).toLocaleTimeString(),
+      cellStyle: { color: gridColors.muted, fontSize: '11px' }
     }
   ]);
 
@@ -67,30 +77,19 @@ export default function BanScript() {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '4px' }}>
-      <style>{`
-        .ag-theme-alpine-dark {
-          --ag-background-color: #0f172a;
-          --ag-header-background-color: #1e293b;
-          --ag-odd-row-background-color: #0f172a;
-          --ag-border-color: #334155;
-          --ag-row-border-color: #1e293b;
-          --ag-header-column-separator-display: none;
-          --ag-foreground-color: #f8fafc;
-          --ag-header-foreground-color: #f8fafc;
-        }
-      `}</style>
+      <style>{GRID_THEME_CSS}</style>
 
-      <div style={{ padding: '4px 0 12px 0', fontSize: '13px', color: '#627d98', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: '4px 0 12px 0', fontSize: '13px', color: gridColors.muted, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>RMS Risk Restrictions</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button onClick={handleExportCsv} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '700', backgroundColor: '#334155', color: '#f8fafc' }}>
+          <button onClick={handleExportCsv} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '700', backgroundColor: '#e2e8f0', color: gridColors.primary }}>
             Export CSV
           </button>
           <span>{bannedCount} Restricted Symbols</span>
         </div>
       </div>
 
-      <div className="ag-theme-alpine-dark" style={{ height: '450px', width: '100%' }}>
+      <div className={GRID_THEME_CLASS} style={{ height: '450px', width: '100%' }}>
         <AgGridReact
           ref={gridRef}
           theme="legacy"

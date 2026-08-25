@@ -1,39 +1,53 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { apiFetch } from '../../api';
+import { useAuth } from '../../auth/AuthContext';
+import { AgGridReact } from 'ag-grid-react';
+import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
+import { GRID_THEME_CLASS, GRID_THEME_CSS, gridColors } from '../../styles/gridTheme';
+
+ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
+
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 const styles = {
-  card: { backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px', border: '1px solid #334155', maxWidth: '600px' },
-  text: { color: '#94a3b8', fontSize: '13px', marginBottom: '16px' },
-  label: { display: 'block', fontSize: '12px', marginBottom: '5px', color: '#94a3b8' },
-  input: { width: '100%', padding: '10px', marginBottom: '16px', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#fff', boxSizing: 'border-box' },
-  btn: { padding: '10px 16px', backgroundColor: '#38bdf8', color: '#0f172a', border: 'none', borderRadius: '4px', fontWeight: '700', cursor: 'pointer' },
-  meta: { fontSize: '12px', color: '#64748b', marginBottom: '16px' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0 16px' }
+  card: { backgroundColor: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' },
+  text: { color: gridColors.muted, fontSize: '13px', marginBottom: '16px' },
+  meta: { fontSize: '12px', color: gridColors.muted, marginBottom: '16px' },
+  btn: { padding: '10px 16px', backgroundColor: gridColors.accent, color: '#fff', border: 'none', borderRadius: '4px', fontWeight: '700', cursor: 'pointer', marginTop: '12px' }
 };
 
-// Field key -> {label, control} - control name maps each limit to its spec Section 8 control.
+// Field key -> {label, control, scope, usedKey}. usedKey points at the matching field in
+// the /oms-config utilisation payload; null means this control is checked per-order, not
+// as a running total, so it has no meaningful "current utilisation" to show.
 const FIELDS = [
-  { key: 'max_order_quantity', label: 'MAX ORDER QUANTITY', control: 'Control 2 - Quantity Limit' },
-  { key: 'max_order_value', label: 'MAX ORDER VALUE (₹)', control: 'Control 3 - Order Value' },
-  { key: 'price_band_pct', label: 'PRICE BAND (%)', control: 'Controls 1/4 - Price / Trade Price Protection' },
-  { key: 'max_open_order_value', label: 'MAX OPEN ORDER VALUE (₹)', control: 'Control 6 - Cumulative Open Order Value' },
-  { key: 'max_position_qty', label: 'MAX POSITION QUANTITY', control: 'Control 8 - Position Limit' },
-  { key: 'max_exposure_value', label: 'MAX EXPOSURE - USER (₹)', control: 'Control 10 - Exposure (User)' },
-  { key: 'global_exposure_value', label: 'MAX EXPOSURE - GLOBAL (₹)', control: 'Control 10 - Exposure (Global)' },
-  { key: 'max_turnover_value', label: 'MAX TURNOVER (₹)', control: 'Controls 9/11 - Trading / Turnover Limit' },
-  { key: 'max_open_orders_count', label: 'MAX OPEN ORDERS PER USER', control: 'Control 13 - Automated Execution' },
-  { key: 'max_orders_per_second', label: 'MAX ORDERS / SECOND (OPS)', control: 'OPS cap' }
+  { key: 'max_order_quantity', label: 'Quantity Limit Check', control: 'Control 2', scope: 'User', usedKey: null },
+  { key: 'max_order_value', label: 'Order Value Check', control: 'Control 3', scope: 'User', usedKey: null },
+  { key: 'price_band_pct', label: 'Price / Trade Price Protection', control: 'Controls 1/4', scope: 'Global', usedKey: null },
+  { key: 'max_open_order_value', label: 'Cumulative Open Order Value', control: 'Control 6', scope: 'User', usedKey: 'max_open_order_value_used' },
+  { key: 'max_position_qty', label: 'Position Limit', control: 'Control 8', scope: 'User', usedKey: 'max_position_qty_used' },
+  { key: 'max_exposure_value', label: 'Exposure Limit (User)', control: 'Control 10', scope: 'User', usedKey: 'max_exposure_value_used' },
+  { key: 'global_exposure_value', label: 'Exposure Limit (Global)', control: 'Control 10', scope: 'Global', usedKey: 'global_exposure_value_used' },
+  { key: 'max_turnover_value', label: 'Trading / Turnover Limit', control: 'Controls 9/11', scope: 'User', usedKey: 'max_turnover_value_used' },
+  { key: 'max_open_orders_count', label: 'Automated Execution Check', control: 'Control 13', scope: 'User', usedKey: 'max_open_orders_count_used' },
+  { key: 'max_orders_per_second', label: 'OPS Cap', control: 'OPS (separate from the 14)', scope: 'Global', usedKey: null }
 ];
 
-export default function OmsConfigPanel() {
-  const [config, setConfig] = useState(null);
-  const [form, setForm] = useState({});
-  const [message, setMessage] = useState('');
+const buildRows = (config, utilisation) => FIELDS.map((f) => {
+  const limit = Number(config[f.key]);
+  const used = f.usedKey ? Number(utilisation[f.usedKey]) : null;
+  const pct = used !== null ? (used / limit) * 100 : null;
+  const status = pct === null ? 'N/A' : pct >= 100 ? 'BREACHED' : pct >= 80 ? 'WARNING' : 'OK';
+  return { key: f.key, label: f.label, control: f.control, scope: f.scope, limit, used, pct, status };
+});
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
-    fetchConfig();
-  }, []);
+export default function OmsConfigPanel() {
+  const { user } = useAuth();
+  const canEdit = user?.role === 'RMS_ADMIN';
+  const [rows, setRows] = useState([]);
+  const [config, setConfig] = useState(null);
+  const [message, setMessage] = useState('');
+  const gridRef = useRef();
 
   async function fetchConfig() {
     try {
@@ -41,20 +55,25 @@ export default function OmsConfigPanel() {
       const data = await response.json();
       if (response.ok) {
         setConfig(data.config);
-        setForm(Object.fromEntries(FIELDS.map((f) => [f.key, data.config[f.key]])));
+        setRows(buildRows(data.config, data.utilisation));
       }
     } catch (err) {
       console.error('Failed to fetch OMS config:', err);
     }
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchConfig();
+  }, []);
+
+  const handleSave = async () => {
     try {
+      const body = Object.fromEntries(rows.map((r) => [r.key, r.limit]));
       const response = await apiFetch('/oms-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
+        body: JSON.stringify(body)
       });
       const data = await response.json();
       if (response.ok) {
@@ -69,29 +88,77 @@ export default function OmsConfigPanel() {
     }
   };
 
+  const columnDefs = useMemo(() => [
+    { field: 'control', headerName: 'CONTROL', width: 250, cellStyle: { fontWeight: '700', color: gridColors.primary } },
+    { field: 'scope', headerName: 'SCOPE', width: 90, cellStyle: { color: gridColors.muted } },
+    {
+      field: 'limit', headerName: 'CONFIGURED LIMIT', width: 150, editable: canEdit,
+      valueParser: (p) => Number(p.newValue),
+      cellStyle: { color: gridColors.accent, fontWeight: '700', backgroundColor: canEdit ? '#fffbeb' : 'transparent' }
+    },
+    {
+      field: 'used', headerName: 'CURRENT UTILISATION', width: 150,
+      valueFormatter: (p) => (p.value != null ? Number(p.value).toLocaleString() : '—'),
+      cellStyle: { color: gridColors.muted }
+    },
+    {
+      field: 'status', headerName: 'STATUS', width: 110,
+      cellStyle: (p) => ({
+        fontWeight: '700',
+        color: p.value === 'BREACHED' ? gridColors.sell : p.value === 'WARNING' ? gridColors.pending : p.value === 'OK' ? gridColors.buy : gridColors.muted
+      })
+    }
+  ], [canEdit]);
+
+  const defaultColDef = useMemo(() => ({
+    sortable: true,
+    resizable: true,
+    cellStyle: { fontFamily: '"JetBrains Mono", monospace', fontSize: '12px', display: 'flex', alignItems: 'center' }
+  }), []);
+
+  const onCellValueChanged = (params) => {
+    // Recompute pct/status locally so editing a limit updates STATUS immediately, before Save.
+    setRows((prev) => prev.map((r) => {
+      if (r.key !== params.data.key) return r;
+      const pct = r.used !== null ? (r.used / params.data.limit) * 100 : null;
+      const status = pct === null ? 'N/A' : pct >= 100 ? 'BREACHED' : pct >= 80 ? 'WARNING' : 'OK';
+      return { ...r, limit: params.data.limit, pct, status };
+    }));
+  };
+
   return (
     <div style={styles.card}>
-      <p style={styles.text}>Platform-wide RMS risk limits - global defaults enforced on every order placement.</p>
+      <style>{GRID_THEME_CSS}</style>
+      <p style={styles.text}>
+        Platform-wide RMS risk limits per the 14 pre-trade controls (spec Section 8).
+        {canEdit
+          ? ' Double-click CONFIGURED LIMIT to edit, then Save.'
+          : ' View-only - edit rights are RMS Admin only.'}
+        {' '}Utilisation is the worst case across all users right now; controls checked per-order rather
+        than as a running total show "—".
+      </p>
       {config && (
         <p style={styles.meta}>
           Last updated {new Date(config.updated_at).toLocaleString()}{config.updated_by ? ` by ${config.updated_by}` : ''}
         </p>
       )}
-      {message && <p style={{ color: '#4ade80', fontSize: '13px', marginBottom: '10px' }}>{message}</p>}
-      <form onSubmit={handleSubmit}>
-        <div style={styles.grid}>
-          {FIELDS.map((f) => (
-            <div key={f.key}>
-              <label style={styles.label} title={f.control}>{f.label}</label>
-              <input
-                type="number" min="0.01" step="0.01" style={styles.input}
-                value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} required
-              />
-            </div>
-          ))}
-        </div>
-        <button type="submit" style={styles.btn}>SAVE CONFIGURATION</button>
-      </form>
+      {message && <p style={{ color: gridColors.buy, fontSize: '13px' }}>{message}</p>}
+
+      <div className={GRID_THEME_CLASS} style={{ height: '400px', width: '100%' }}>
+        <AgGridReact
+          ref={gridRef}
+          theme="legacy"
+          rowData={rows}
+          columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          getRowId={(params) => params.data.key}
+          onCellValueChanged={onCellValueChanged}
+          rowHeight={38}
+          headerHeight={35}
+        />
+      </div>
+
+      {canEdit && <button style={styles.btn} onClick={handleSave}>SAVE CONFIGURATION</button>}
     </div>
   );
 }

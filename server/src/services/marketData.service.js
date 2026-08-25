@@ -2,13 +2,14 @@ import { matchPendingOrders } from './executionEngine.service.js';
 
 // Initial Mock Ticker Master
 // expiry: weekly for index options (nearest Thursday), monthly for stock futures (last Thursday).
+// token: NSE-style numeric instrument identifier - mock/stable, no real exchange master yet.
 const INITIAL_INSTRUMENTS = [
-  { symbol: 'NIFTY 24500 CE', ltp: 142.50, prevClose: 130.00, high: 165.00, low: 110.00, volume: 1254000, bid: 142.30, ask: 142.60, expiry: '2026-08-27' },
-  { symbol: 'NIFTY 24500 PE', ltp: 88.20, prevClose: 95.00, high: 105.00, low: 72.50, volume: 980000, bid: 88.05, ask: 88.35, expiry: '2026-08-27' },
-  { symbol: 'BANKNIFTY 52000 CE', ltp: 310.75, prevClose: 290.00, high: 360.00, low: 275.00, volume: 640000, bid: 310.25, ask: 311.00, expiry: '2026-08-27' },
-  { symbol: 'BANKNIFTY 52000 PE', ltp: 195.40, prevClose: 215.00, high: 230.00, low: 180.00, volume: 520000, bid: 195.10, ask: 195.70, expiry: '2026-08-27' },
-  { symbol: 'RELIANCE FUT', ltp: 2985.00, prevClose: 2970.00, high: 3010.00, low: 2965.00, volume: 340000, bid: 2984.50, ask: 2985.50, expiry: '2026-09-24' },
-  { symbol: 'HDFCBANK FUT', ltp: 1640.50, prevClose: 1655.00, high: 1662.00, low: 1638.00, volume: 410000, bid: 1640.10, ask: 1640.80, expiry: '2026-09-24' }
+  { symbol: 'NIFTY 24500 CE', instrument: 'NIFTY', optionType: 'CE', strikePrice: 24500, ltp: 142.50, prevClose: 130.00, high: 165.00, low: 110.00, volume: 1254000, bid: 142.30, ask: 142.60, expiry: '2026-08-27', token: 46201 },
+  { symbol: 'NIFTY 24500 PE', instrument: 'NIFTY', optionType: 'PE', strikePrice: 24500, ltp: 88.20, prevClose: 95.00, high: 105.00, low: 72.50, volume: 980000, bid: 88.05, ask: 88.35, expiry: '2026-08-27', token: 46202 },
+  { symbol: 'BANKNIFTY 52000 CE', instrument: 'BANKNIFTY', optionType: 'CE', strikePrice: 52000, ltp: 310.75, prevClose: 290.00, high: 360.00, low: 275.00, volume: 640000, bid: 310.25, ask: 311.00, expiry: '2026-08-27', token: 46301 },
+  { symbol: 'BANKNIFTY 52000 PE', instrument: 'BANKNIFTY', optionType: 'PE', strikePrice: 52000, ltp: 195.40, prevClose: 215.00, high: 230.00, low: 180.00, volume: 520000, bid: 195.10, ask: 195.70, expiry: '2026-08-27', token: 46302 },
+  { symbol: 'RELIANCE FUT', instrument: 'RELIANCE', optionType: null, strikePrice: null, ltp: 2985.00, prevClose: 2970.00, high: 3010.00, low: 2965.00, volume: 340000, bid: 2984.50, ask: 2985.50, expiry: '2026-09-24', token: 35001 },
+  { symbol: 'HDFCBANK FUT', instrument: 'HDFCBANK', optionType: null, strikePrice: null, ltp: 1640.50, prevClose: 1655.00, high: 1662.00, low: 1638.00, volume: 410000, bid: 1640.10, ask: 1640.80, expiry: '2026-09-24', token: 35002 }
 ];
 
 let marketState = [...INITIAL_INSTRUMENTS];
@@ -25,6 +26,12 @@ export const getLtp = (symbol) => {
 export const getExpiry = (symbol) => {
   const instrument = marketState.find((inst) => inst.symbol === symbol);
   return instrument ? instrument.expiry : null;
+};
+
+// NSE-style instrument token for a symbol, same "null if unknown" contract as getLtp.
+export const getToken = (symbol) => {
+  const instrument = marketState.find((inst) => inst.symbol === symbol);
+  return instrument ? instrument.token : null;
 };
 
 const tickInstrument = (inst) => {
