@@ -8,7 +8,9 @@ import KillSwitchPanel from '../components/admin/KillSwitchPanel';
 import AuditLogPanel from '../components/admin/AuditLogPanel';
 import CompanyAccountManagement from '../components/admin/CompanyAccountManagement';
 import SecurityLimitsPanel from '../components/admin/SecurityLimitsPanel';
+import ServersPanel from '../components/admin/ServersPanel';
 import OrderBook from '../components/OrderBook';
+import TradeBook from '../components/TradeBook';
 import NetPositions from '../components/NetPositions';
 import Watchlist from '../components/Watchlist';
 import BanScript from '../components/BanScript';
@@ -17,7 +19,8 @@ const TABS = [
   { key: 'dashboard', label: 'RMS Dashboard' },
   { key: 'company-accounts', label: 'Company Account Management', superAdminOnly: true },
   { key: 'users', label: 'User & Role Management' },
-  { key: 'oms-config', label: 'Server / OMS Config' },
+  { key: 'oms-config', label: 'RMS Risk Limits (14 Controls)' },
+  { key: 'servers', label: 'Server / OMS Configuration' },
   { key: 'security-limits', label: 'Security-Wise Limits' },
   { key: 'kill-switch', label: 'Kill Switch' },
   { key: 'audit-log', label: 'Audit Log' },
@@ -43,6 +46,11 @@ const PANELS = {
       <OmsConfigPanel />
     </div>
   ),
+  servers: () => (
+    <div style={{ padding: '20px' }}>
+      <ServersPanel />
+    </div>
+  ),
   'security-limits': () => (
     <div style={{ padding: '20px' }}>
       <SecurityLimitsPanel />
@@ -59,8 +67,9 @@ const PANELS = {
     </div>
   ),
   orders: () => (
-    <div style={{ padding: '20px' }}>
+    <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <OrderBook />
+      <TradeBook />
     </div>
   ),
   positions: () => (

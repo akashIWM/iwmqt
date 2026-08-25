@@ -18,6 +18,7 @@ import omsConfigRoutes from './routes/oms-config.routes.js';
 import auditRoutes from './routes/audit.routes.js';
 import companyRoutes from './routes/company.routes.js';
 import securityLimitsRoutes from './routes/security-limits.routes.js';
+import serversRoutes from './routes/servers.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -39,6 +40,7 @@ app.use('/api/oms-config', omsConfigRoutes);
 app.use('/api/audit-log', auditRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/security-limits', securityLimitsRoutes);
+app.use('/api/servers', serversRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'Platform API is running' });

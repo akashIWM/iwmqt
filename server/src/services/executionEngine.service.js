@@ -25,6 +25,11 @@ export const matchPendingOrders = async (symbol, ltp) => {
       order.symbol,
       `${order.side} ${order.quantity} @ ${ltp} (order ${order.id})`
     );
+    await query(
+      `INSERT INTO order_events (order_id, user_id, symbol, order_type, quantity, price, event)
+       VALUES ($1, $2, $3, $4, $5, $6, 'EXECUTED')`,
+      [order.id, order.user_id, order.symbol, order.type, order.quantity, order.price]
+    );
   }
 
   return filled.rows;

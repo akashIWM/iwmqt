@@ -12,25 +12,28 @@ router.get('/', authenticate, async (req, res) => {
     const userId = req.user.userId || req.user.id;
     const isRmsRole = req.user.role === 'RMS_ADMIN' || req.user.role === 'SUPER_ADMIN';
 
+    // Grouped by (user_id, symbol) rather than symbol alone, even for the RMS/Super Admin
+    // view - collapsing across users would erase per-trader ("OMS-wise") visibility, which
+    // the spec requires the Net Positions grid to support.
     const positionsQuery = isRmsRole
       ? await query(
           `SELECT
-             symbol,
+             user_id, symbol,
              SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) as net_qty,
              AVG(price) as avg_price
            FROM orders
            WHERE status = 'EXECUTED'
-           GROUP BY symbol
+           GROUP BY user_id, symbol
            HAVING SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) <> 0`
         )
       : await query(
           `SELECT
-             symbol,
+             user_id, symbol,
              SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) as net_qty,
              AVG(price) as avg_price
            FROM orders
           WHERE user_id = $1 AND status = 'EXECUTED'
-           GROUP BY symbol
+           GROUP BY user_id, symbol
            HAVING SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) <> 0`,
           [userId]
         );

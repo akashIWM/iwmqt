@@ -3,6 +3,7 @@ import { WS_BASE_URL } from '../api';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
 import { useGridColumnPersistence } from '../hooks/useGridColumnPersistence';
+import { GRID_THEME_CLASS, GRID_THEME_CSS, gridColors } from '../styles/gridTheme';
 
 ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
 
@@ -61,15 +62,20 @@ export default function Watchlist() {
     };
   }, []);
 
-  // Cleaned up Column Definitions (No background flashing)
+  // Column set per GUI spec 6.2: Instrument, Symbol, Expiry, Option Type, Strike Price,
+  // LTP, Bid, Ask, Chg% - plus High/Low/absolute Chg kept from the original build.
   const [columnDefs] = useState([
-    { field: 'symbol', headerName: 'INSTRUMENT', flex: 1.5, minWidth: 160, pinned: 'left', cellStyle: { fontWeight: '700', color: '#f8fafc' } },
+    { field: 'instrument', headerName: 'INSTRUMENT', width: 110, cellStyle: { color: gridColors.muted } },
+    { field: 'symbol', headerName: 'SYMBOL', flex: 1.5, minWidth: 160, pinned: 'left', cellStyle: { fontWeight: '700', color: gridColors.primary } },
+    { field: 'expiry', headerName: 'EXPIRY', width: 100, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
+    { field: 'optionType', headerName: 'OPTION TYPE', width: 110, valueFormatter: (p) => p.value || 'FUT', cellStyle: { color: gridColors.muted } },
+    { field: 'strikePrice', headerName: 'STRIKE PRICE', width: 110, valueFormatter: (p) => p.value ?? '—', cellStyle: { color: gridColors.muted } },
     {
       field: 'ltp',
       headerName: 'LTP',
       flex: 1,
       valueFormatter: (p) => `₹${p.value?.toFixed(2) || '0.00'}`,
-      cellStyle: { fontWeight: '700', color: '#38bdf8' }, // Constant Cyan text color
+      cellStyle: { fontWeight: '700', color: gridColors.accent },
       enableCellChangeFlash: true
     },
     {
@@ -77,7 +83,7 @@ export default function Watchlist() {
       headerName: 'CHG',
       flex: 1,
       valueFormatter: (p) => p.value > 0 ? `+${p.value?.toFixed(2)}` : p.value?.toFixed(2),
-      cellStyle: (p) => ({ color: p.value >= 0 ? '#4ade80' : '#f87171', fontWeight: '600' }), // Text changes color, not background
+      cellStyle: (p) => ({ color: p.value >= 0 ? gridColors.buy : gridColors.sell, fontWeight: '600' }),
       enableCellChangeFlash: true
     },
     {
@@ -85,13 +91,13 @@ export default function Watchlist() {
       headerName: '% CHG',
       flex: 1,
       valueFormatter: (p) => `${p.value > 0 ? '+' : ''}${p.value?.toFixed(2) || '0'}%`,
-      cellStyle: (p) => ({ color: p.value >= 0 ? '#4ade80' : '#f87171' }),
+      cellStyle: (p) => ({ color: p.value >= 0 ? gridColors.buy : gridColors.sell }),
       enableCellChangeFlash: true
     },
-    { field: 'bid', headerName: 'BID', flex: 1, valueFormatter: (p) => `₹${p.value?.toFixed(2)}`, cellStyle: { color: '#94a3b8' }, enableCellChangeFlash: true },
-    { field: 'ask', headerName: 'ASK', flex: 1, valueFormatter: (p) => `₹${p.value?.toFixed(2)}`, cellStyle: { color: '#94a3b8' }, enableCellChangeFlash: true },
-    { field: 'high', headerName: 'HIGH', flex: 1, valueFormatter: (p) => p.value?.toFixed(2), cellStyle: { color: '#64748b' } },
-    { field: 'low', headerName: 'LOW', flex: 1, valueFormatter: (p) => p.value?.toFixed(2), cellStyle: { color: '#64748b' } }
+    { field: 'bid', headerName: 'BID', flex: 1, valueFormatter: (p) => `₹${p.value?.toFixed(2)}`, cellStyle: { color: gridColors.muted }, enableCellChangeFlash: true },
+    { field: 'ask', headerName: 'ASK', flex: 1, valueFormatter: (p) => `₹${p.value?.toFixed(2)}`, cellStyle: { color: gridColors.muted }, enableCellChangeFlash: true },
+    { field: 'high', headerName: 'HIGH', flex: 1, valueFormatter: (p) => p.value?.toFixed(2), cellStyle: { color: gridColors.muted } },
+    { field: 'low', headerName: 'LOW', flex: 1, valueFormatter: (p) => p.value?.toFixed(2), cellStyle: { color: gridColors.muted } }
   ]);
 
   const defaultColDef = useMemo(() => ({
@@ -111,49 +117,40 @@ export default function Watchlist() {
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: '#0f172a', // Deep terminal navy
+      backgroundColor: '#ffffff',
       borderRadius: '12px',
       overflow: 'hidden',
-      boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+      boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
+      border: '1px solid #e2e8f0'
     },
     header: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
       padding: '12px 20px',
-      backgroundColor: '#1e293b',
-      borderBottom: '1px solid #334155'
+      backgroundColor: '#f1f5f9',
+      borderBottom: '1px solid #e2e8f0'
     },
-    title: { margin: 0, fontSize: '15px', fontWeight: '700', color: '#f8fafc', letterSpacing: '0.5px' },
+    title: { margin: 0, fontSize: '15px', fontWeight: '700', color: gridColors.primary, letterSpacing: '0.5px' },
     headerRight: { display: 'flex', alignItems: 'center', gap: '10px' },
     exportBtn: {
       fontSize: '11px', padding: '4px 10px', borderRadius: '6px', fontWeight: '700',
-      backgroundColor: '#334155', color: '#f8fafc', border: 'none', cursor: 'pointer'
+      backgroundColor: '#e2e8f0', color: gridColors.primary, border: 'none', cursor: 'pointer'
     },
     badge: {
       fontSize: '11px',
       padding: '4px 10px',
       borderRadius: '6px',
       fontWeight: '700',
-      backgroundColor: connected ? 'rgba(74, 222, 128, 0.15)' : 'rgba(248, 113, 113, 0.15)',
-      color: connected ? '#4ade80' : '#f87171',
-      border: `1px solid ${connected ? 'rgba(74, 222, 128, 0.3)' : 'rgba(248, 113, 113, 0.3)'}`
+      backgroundColor: connected ? 'rgba(43, 138, 62, 0.1)' : 'rgba(201, 42, 42, 0.1)',
+      color: connected ? gridColors.buy : gridColors.sell,
+      border: `1px solid ${connected ? 'rgba(43, 138, 62, 0.3)' : 'rgba(201, 42, 42, 0.3)'}`
     }
   };
 
   return (
     <div style={styles.container}>
-      {/* Basic AG Grid Dark Theme Overrides without flash animations */}
-      <style>{`
-        .ag-theme-alpine-dark {
-          --ag-background-color: #0f172a;
-          --ag-header-background-color: #1e293b;
-          --ag-odd-row-background-color: #0f172a;
-          --ag-border-color: #334155;
-          --ag-row-border-color: #1e293b;
-          --ag-header-column-separator-display: none;
-        }
-      `}</style>
+      <style>{GRID_THEME_CSS}</style>
 
       <div style={styles.header}>
         <h4 style={styles.title}>SCRIPT WATCH</h4>
@@ -163,7 +160,7 @@ export default function Watchlist() {
         </div>
       </div>
 
-      <div className="ag-theme-alpine-dark" style={{ height: '450px', width: '100%' }}>
+      <div className={GRID_THEME_CLASS} style={{ height: '450px', width: '100%' }}>
         <AgGridReact
           ref={gridRef}
           theme="legacy"

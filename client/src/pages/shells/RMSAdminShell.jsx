@@ -20,9 +20,10 @@ export default function RMSAdminShell() {
         <p style={styles.text}>Welcome, <strong>{user.fullName}</strong>. Here are your authorized modules:</p>
 
         <div style={styles.grid}>
-          <AccessModule title="RMS Dashboard (14 Controls)" scope="✔ Edit" onClick={() => navigate('/app/admin')} />
+          <AccessModule title="RMS Dashboard (Stats & BanScript)" scope="✔ Edit" onClick={() => navigate('/app/admin')} />
+          <AccessModule title="RMS Risk Limits (14 Controls)" scope="✔ Edit" onClick={() => navigate('/app/admin?tab=oms-config')} />
           <AccessModule title="User & Role Management" scope="✔ Own Entity" onClick={() => navigate('/app/admin?tab=users')} />
-          <AccessModule title="Server / OMS Config" scope="✔ Entity Scope" onClick={() => navigate('/app/admin?tab=oms-config')} />
+          <AccessModule title="Server / OMS Configuration" scope="✔ Entity Scope" onClick={() => navigate('/app/admin?tab=servers')} />
           <AccessModule title="Security-Wise Limits" scope="✔ Entity Scope" onClick={() => navigate('/app/admin?tab=security-limits')} />
           <AccessModule title="Kill Switch" scope="✔ User / Global" onClick={() => navigate('/app/admin?tab=kill-switch')} />
           <AccessModule title="Audit Log" scope="✔ Entity-wide" onClick={() => navigate('/app/admin?tab=audit-log')} />

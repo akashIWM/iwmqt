@@ -19,10 +19,11 @@ router.get('/banned', authenticate, async (req, res) => {
 // POST /api/rms/ban - RMS Admin can ban a script
 router.post('/ban', authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN', 'COMPANY_ACCOUNT'), async (req, res) => {
   try {
-    const { symbol, reason } = req.body;
+    const { symbol, reason, asmStage, gsmStage } = req.body;
     const result = await query(
-      `INSERT INTO banned_scripts (symbol, reason) VALUES ($1, $2) ON CONFLICT (symbol) DO UPDATE SET reason = $2 RETURNING *`,
-      [symbol, reason || 'Volatility Limit Reached']
+      `INSERT INTO banned_scripts (symbol, reason, asm_stage, gsm_stage) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (symbol) DO UPDATE SET reason = $2, asm_stage = $3, gsm_stage = $4 RETURNING *`,
+      [symbol, reason || 'Volatility Limit Reached', asmStage || null, gsmStage || null]
     );
     await logAudit(req.user.userId, 'BAN_SCRIPT', symbol, reason || null);
     res.status(201).json({ message: `Script ${symbol} banned successfully`, ban: result.rows[0] });

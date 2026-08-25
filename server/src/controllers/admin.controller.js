@@ -9,11 +9,15 @@ export const getAllUsers = async (req, res) => {
   try {
     const result = req.user.role === 'COMPANY_ACCOUNT'
       ? await query(
-          'SELECT id, user_id, full_name, email, role, company_id, status, created_at FROM users WHERE company_id = $1 ORDER BY created_at DESC',
+          `SELECT u.id, u.user_id, u.full_name, u.email, u.role, u.company_id, u.status, u.created_at, u.last_login_at, s.server_id
+           FROM users u LEFT JOIN servers s ON s.assigned_trader = u.user_id
+           WHERE u.company_id = $1 ORDER BY u.created_at DESC`,
           [req.user.companyId]
         )
       : await query(
-          'SELECT id, user_id, full_name, email, role, company_id, status, created_at FROM users ORDER BY created_at DESC'
+          `SELECT u.id, u.user_id, u.full_name, u.email, u.role, u.company_id, u.status, u.created_at, u.last_login_at, s.server_id
+           FROM users u LEFT JOIN servers s ON s.assigned_trader = u.user_id
+           ORDER BY u.created_at DESC`
         );
     res.status(200).json({ users: result.rows });
   } catch (error) {

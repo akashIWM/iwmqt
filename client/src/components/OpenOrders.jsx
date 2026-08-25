@@ -1,15 +1,22 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { apiFetch } from '../api';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
+import { syncGridRows } from '../utils/gridSync';
+import { useGridColumnPersistence } from '../hooks/useGridColumnPersistence';
+import { GRID_THEME_CLASS, GRID_THEME_CSS, gridColors, statusColor } from '../styles/gridTheme';
 
 ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
 
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 
+const getRowId = (row) => row.id;
+
 export default function OpenOrders() {
-  const [openOrders, setOpenOrders] = useState([]);
+  const [openCount, setOpenCount] = useState(0);
+  const gridRef = useRef();
+  const columnPersistence = useGridColumnPersistence('grid-columns:open-orders');
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability
@@ -23,9 +30,11 @@ export default function OpenOrders() {
       const response = await apiFetch('/orders');
       const data = await response.json();
       if (response.ok) {
-        // Filter only pending active orders
-        const pending = data.orders.filter(o => o.status === 'PENDING');
-        setOpenOrders(pending);
+        const pending = data.orders.filter((o) => o.status === 'PENDING');
+        // Transaction-based update (add/update/remove by row id), never a full rowData
+        // replacement - per the AG Grid contract, this is required, not just a nicety.
+        syncGridRows(gridRef.current?.api, pending, getRowId);
+        setOpenCount(pending.length);
       }
     } catch (err) {
       console.error('Failed to fetch open orders:', err);
@@ -34,9 +43,7 @@ export default function OpenOrders() {
 
   const cancelOrder = async (orderId) => {
     try {
-      const response = await apiFetch(`/orders/${orderId}/cancel`, {
-        method: 'PUT',
-      });
+      const response = await apiFetch(`/orders/${orderId}/cancel`, { method: 'PUT' });
       if (response.ok) {
         fetchOpenOrders();
       } else {
@@ -49,36 +56,31 @@ export default function OpenOrders() {
   };
 
   const [columnDefs] = useState([
-    { field: 'symbol', headerName: 'INSTRUMENT', width: 130, cellStyle: { fontWeight: '700', color: '#f8fafc' } },
-    { 
-      field: 'side', 
-      headerName: 'SIDE', 
-      width: 75, 
-      cellStyle: (p) => ({ color: p.value === 'BUY' ? '#4ade80' : '#f87171', fontWeight: '700' }) 
-    },
-    { field: 'quantity', headerName: 'QTY', width: 75, cellStyle: { color: '#38bdf8' } },
+    { field: 'id', headerName: 'ORDER ID', width: 100, valueFormatter: (p) => p.value?.slice(0, 8), cellStyle: { color: gridColors.muted } },
+    { field: 'symbol', headerName: 'INSTRUMENT', width: 140, cellStyle: { fontWeight: '700', color: gridColors.primary } },
+    { field: 'token', headerName: 'TOKEN', width: 80, cellStyle: { color: gridColors.muted } },
+    { field: 'expiry', headerName: 'EXPIRY', width: 90, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
     {
-      field: 'price',
-      headerName: 'PRICE',
-      width: 85,
-      valueFormatter: (p) => p.value ? `₹${p.value}` : 'MKT',
-      cellStyle: { color: '#facc15' }
+      field: 'side', headerName: 'SIDE', width: 70,
+      cellStyle: (p) => ({ color: p.value === 'BUY' ? gridColors.buy : gridColors.sell, fontWeight: '700' })
+    },
+    { field: 'quantity', headerName: 'QTY', width: 70, enableCellChangeFlash: true, cellStyle: { color: gridColors.primary } },
+    {
+      field: 'price', headerName: 'PRICE', width: 85, enableCellChangeFlash: true,
+      valueFormatter: (p) => (p.value ? `₹${p.value}` : 'MKT'), cellStyle: { color: gridColors.price }
     },
     {
-      field: 'expiry',
-      headerName: 'EXPIRY',
-      width: 90,
-      valueFormatter: (p) => p.value || '—',
-      cellStyle: { color: '#94a3b8' }
+      field: 'status', headerName: 'STATUS', width: 90, enableCellChangeFlash: true,
+      cellStyle: (p) => ({ color: statusColor(p.value), fontWeight: '700' })
     },
     {
       headerName: 'ACTION',
       width: 90,
       cellRenderer: (params) => (
-        <button 
+        <button
           onClick={() => cancelOrder(params.data.id)}
           style={{
-            backgroundColor: '#ef4444',
+            backgroundColor: gridColors.sell,
             color: '#fff',
             border: 'none',
             borderRadius: '4px',
@@ -100,37 +102,35 @@ export default function OpenOrders() {
     cellStyle: { fontFamily: '"JetBrains Mono", monospace', fontSize: '11px', display: 'flex', alignItems: 'center' }
   }), []);
 
-  const getRowId = useMemo(() => (params) => params.data.id, []);
+  const handleExportCsv = () => {
+    gridRef.current?.api?.exportDataAsCsv({ fileName: `open-orders-${Date.now()}.csv` });
+  };
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <style>{`
-        .ag-theme-alpine-dark {
-          --ag-background-color: #0f172a;
-          --ag-header-background-color: #1e293b;
-          --ag-odd-row-background-color: #0f172a;
-          --ag-border-color: #334155;
-          --ag-row-border-color: #1e293b;
-          --ag-header-column-separator-display: none;
-          --ag-foreground-color: #f8fafc;
-          --ag-header-foreground-color: #f8fafc;
-        }
-      `}</style>
-      
-      <div style={{ padding: '4px 0 12px 0', fontSize: '13px', color: '#627d98', display: 'flex', justifyContent: 'space-between' }}>
+      <style>{GRID_THEME_CSS}</style>
+
+      <div style={{ padding: '4px 0 12px 0', fontSize: '13px', color: gridColors.muted, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>Pending Working Orders</span>
-        <span>{openOrders.length} Open</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={handleExportCsv} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '700', backgroundColor: '#e2e8f0', color: gridColors.primary }}>
+            Export CSV
+          </button>
+          <span>{openCount} Open</span>
+        </div>
       </div>
 
-      <div className="ag-theme-alpine-dark" style={{ height: '450px', width: '100%' }}>
+      <div className={GRID_THEME_CLASS} style={{ height: '450px', width: '100%' }}>
         <AgGridReact
+          ref={gridRef}
           theme="legacy"
-          rowData={openOrders}
+          rowData={[]}
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}
-          getRowId={getRowId}
+          getRowId={(params) => getRowId(params.data)}
           rowHeight={35}
           headerHeight={35}
+          {...columnPersistence}
         />
       </div>
     </div>

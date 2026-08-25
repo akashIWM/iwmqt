@@ -1,7 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
+import { AgGridReact } from 'ag-grid-react';
+import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
+import { GRID_THEME_CLASS, GRID_THEME_CSS, gridColors } from '../../styles/gridTheme';
+
+ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
+
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 const ALL_ROLES = [
   { value: 'TRADER', label: 'Trader' },
@@ -13,22 +21,13 @@ const ALL_ROLES = [
 const COMPANY_ACCOUNT_CREATABLE_ROLES = ALL_ROLES.filter((r) => ['RMS_ADMIN', 'PM', 'TRADER'].includes(r.value));
 
 const styles = {
-  card: { backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px', border: '1px solid #334155', marginBottom: '20px' },
-  text: { color: '#94a3b8', fontSize: '13px', marginBottom: '16px' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '10px 12px', fontSize: '12px', color: '#94a3b8', borderBottom: '1px solid #334155' },
-  td: { padding: '10px 12px', fontSize: '13px', color: '#f8fafc', borderBottom: '1px solid #334155' },
-  select: { padding: '6px 8px', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc', fontSize: '12px' },
-  actionBtn: { padding: '6px 12px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '11px', color: '#fff' },
-  badge: (active) => ({
-    padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700',
-    backgroundColor: active ? 'rgba(74, 222, 128, 0.15)' : 'rgba(248, 113, 113, 0.15)',
-    color: active ? '#4ade80' : '#f87171'
-  }),
-  input: { padding: '8px 10px', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#fff' },
+  card: { backgroundColor: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px' },
+  text: { color: gridColors.muted, fontSize: '13px', marginBottom: '16px' },
+  select: { padding: '6px 8px', borderRadius: '4px', border: '1px solid #d9e2ec', backgroundColor: '#f8f9fa', color: gridColors.primary, fontSize: '12px' },
+  input: { padding: '8px 10px', borderRadius: '4px', border: '1px solid #d9e2ec', backgroundColor: '#f8f9fa', color: gridColors.primary },
   row: { display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' },
-  btn: { padding: '8px 16px', backgroundColor: '#38bdf8', color: '#0f172a', border: 'none', borderRadius: '4px', fontWeight: '700', cursor: 'pointer' },
-  tempPassword: { backgroundColor: '#052e16', border: '1px solid #16a34a', color: '#4ade80', padding: '12px', borderRadius: '6px', fontSize: '13px', marginBottom: '16px', fontFamily: 'monospace' }
+  btn: { padding: '8px 16px', backgroundColor: gridColors.accent, color: '#fff', border: 'none', borderRadius: '4px', fontWeight: '700', cursor: 'pointer' },
+  tempPassword: { backgroundColor: '#ecfdf5', border: '1px solid #2b8a3e', color: '#1a5c2a', padding: '12px', borderRadius: '6px', fontSize: '13px', marginBottom: '16px', fontFamily: 'monospace' }
 };
 
 export default function UserRoleManagement() {
@@ -39,6 +38,7 @@ export default function UserRoleManagement() {
   const [newUser, setNewUser] = useState({ userId: '', fullName: '', email: '', role: 'TRADER' });
   const [createError, setCreateError] = useState('');
   const [createResult, setCreateResult] = useState(null);
+  const gridRef = useRef();
 
   const creatableRoles = currentUser.role === 'COMPANY_ACCOUNT' ? COMPANY_ACCOUNT_CREATABLE_ROLES : ALL_ROLES;
 
@@ -87,11 +87,76 @@ export default function UserRoleManagement() {
     }
   };
 
+  const handleForceReset = async (userId, displayUserId) => {
+    if (!window.confirm(`Force-reset the password for ${displayUserId}? They'll need to set a new one on next login.`)) return;
+    try {
+      const response = await axios.post(`${API_BASE_URL}/admin/users/${userId}/reset-password`);
+      alert(`New temp password for ${displayUserId}: ${response.data.tempPassword}\n\nShare this securely - it will not be shown again.`);
+      loadUsers();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to reset password');
+    }
+  };
+
+  const [columnDefs] = useState([
+    { field: 'user_id', headerName: 'USER ID', width: 120, cellStyle: { fontWeight: '700', color: gridColors.primary } },
+    { field: 'full_name', headerName: 'NAME', width: 160, cellStyle: { color: gridColors.primary } },
+    { field: 'email', headerName: 'EMAIL', width: 200, cellStyle: { color: gridColors.muted } },
+    {
+      field: 'role', headerName: 'ROLE', width: 170,
+      cellRenderer: (params) => (
+        <select style={styles.select} value={params.value} onChange={(e) => handleRoleChange(params.data.id, e.target.value)}>
+          {ALL_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+      )
+    },
+    {
+      headerName: 'SERVER / OMS MAPPING', width: 170,
+      valueGetter: (p) => p.data.server_id || '—',
+      cellStyle: { color: gridColors.muted }
+    },
+    {
+      field: 'last_login_at', headerName: 'LAST LOGIN', width: 150,
+      valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleString() : 'Never'),
+      cellStyle: { color: gridColors.muted, fontSize: '11px' }
+    },
+    {
+      field: 'status', headerName: 'STATUS', width: 90,
+      cellStyle: (p) => ({ color: p.value === 'ACTIVE' ? gridColors.buy : gridColors.sell, fontWeight: '700' })
+    },
+    {
+      headerName: 'ACTION', width: 190,
+      cellRenderer: (params) => (
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            style={{ padding: '4px 10px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '11px', color: '#fff', backgroundColor: params.data.status === 'ACTIVE' ? gridColors.sell : gridColors.buy }}
+            onClick={() => handleStatusToggle(params.data.id, params.data.status)}
+          >
+            {params.data.status === 'ACTIVE' ? 'Lock' : 'Unlock'}
+          </button>
+          <button
+            style={{ padding: '4px 10px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '700', fontSize: '11px', color: '#fff', backgroundColor: gridColors.pending }}
+            onClick={() => handleForceReset(params.data.id, params.data.user_id)}
+          >
+            Reset PW
+          </button>
+        </div>
+      )
+    }
+  ]);
+
+  const defaultColDef = useMemo(() => ({
+    sortable: true,
+    resizable: true,
+    cellStyle: { fontFamily: '"JetBrains Mono", monospace', fontSize: '12px', display: 'flex', alignItems: 'center' }
+  }), []);
+
   return (
     <div>
+      <style>{GRID_THEME_CSS}</style>
       <div style={styles.card}>
-        <h3 style={{ marginTop: 0 }}>Add User</h3>
-        {createError && <p style={{ color: '#f87171', fontSize: '13px' }}>{createError}</p>}
+        <h3 style={{ marginTop: 0, color: gridColors.primary }}>Add User</h3>
+        {createError && <p style={{ color: gridColors.sell, fontSize: '13px' }}>{createError}</p>}
         {createResult && (
           <div style={styles.tempPassword}>
             Login <strong>{createResult.user.user_id}</strong> created. One-time temp password: <strong>{createResult.tempPassword}</strong>
@@ -110,52 +175,21 @@ export default function UserRoleManagement() {
       </div>
 
       <div style={styles.card}>
-      <p style={styles.text}>Assign roles and lock/unlock accounts for every registered user.</p>
-      {loading ? <p style={styles.text}>Loading user data...</p> : error ? <p style={{ ...styles.text, color: '#f87171' }}>{error}</p> : (
-      <div style={{ overflowX: 'auto' }}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Full Name</th>
-              <th style={styles.th}>User ID</th>
-              <th style={styles.th}>Email</th>
-              <th style={styles.th}>Role</th>
-              <th style={styles.th}>Status</th>
-              <th style={styles.th}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id}>
-                <td style={styles.td}>{u.full_name}</td>
-                <td style={styles.td}><strong>{u.user_id}</strong></td>
-                <td style={styles.td}>{u.email}</td>
-                <td style={styles.td}>
-                  <select style={styles.select} value={u.role} onChange={(e) => handleRoleChange(u.id, e.target.value)}>
-                    <option value="TRADER">Trader</option>
-                    <option value="PM">Portfolio Manager</option>
-                    <option value="RMS_ADMIN">RMS Admin</option>
-                    <option value="COMPANY_ACCOUNT">Company Account</option>
-                    <option value="SUPER_ADMIN">Super Admin</option>
-                  </select>
-                </td>
-                <td style={styles.td}>
-                  <span style={styles.badge(u.status === 'ACTIVE')}>{u.status}</span>
-                </td>
-                <td style={styles.td}>
-                  <button
-                    style={{ ...styles.actionBtn, backgroundColor: u.status === 'ACTIVE' ? '#fa5252' : '#40c057' }}
-                    onClick={() => handleStatusToggle(u.id, u.status)}
-                  >
-                    {u.status === 'ACTIVE' ? 'Lock' : 'Unlock'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      )}
+        <p style={styles.text}>Assign roles and lock/unlock accounts for every registered user.</p>
+        {loading ? <p style={styles.text}>Loading user data...</p> : error ? <p style={{ ...styles.text, color: gridColors.sell }}>{error}</p> : (
+          <div className={GRID_THEME_CLASS} style={{ height: '400px', width: '100%' }}>
+            <AgGridReact
+              ref={gridRef}
+              theme="legacy"
+              rowData={users}
+              columnDefs={columnDefs}
+              defaultColDef={defaultColDef}
+              getRowId={(params) => params.data.id}
+              rowHeight={40}
+              headerHeight={35}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
