@@ -144,7 +144,7 @@ const handleSubmit = async (e) => {
           </div>
           <div style={{ flex: 1 }}>
             <label style={styles.label}>LIMIT PRICE</label>
-            <input type="number" name="price" value={order.price} onChange={handleChange} style={styles.input} step="0.05" min="0.01" required />
+            <input type="number" name="price" value={order.price} onChange={handleChange} style={styles.input} step="0.05" min="0" required />
           </div>
         </div>
 
