@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../db/postgres.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { logAudit } from '../utils/audit.js';
+import { refreshBannedScripts } from '../services/rmsConfigCache.service.js';
 
 const router = express.Router();
 
@@ -25,6 +26,7 @@ router.post('/ban', authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN', 'COMPANY
        ON CONFLICT (symbol) DO UPDATE SET reason = $2, asm_stage = $3, gsm_stage = $4 RETURNING *`,
       [symbol, reason || 'Volatility Limit Reached', asmStage || null, gsmStage || null]
     );
+    await refreshBannedScripts();
     await logAudit(req.user.userId, 'BAN_SCRIPT', symbol, reason || null);
     res.status(201).json({ message: `Script ${symbol} banned successfully`, ban: result.rows[0] });
   } catch (error) {
@@ -38,6 +40,7 @@ router.delete('/unban/:symbol', authenticate, authorize('RMS_ADMIN', 'SUPER_ADMI
   try {
     const { symbol } = req.params;
     await query('DELETE FROM banned_scripts WHERE symbol = $1', [symbol]);
+    await refreshBannedScripts();
     await logAudit(req.user.userId, 'UNBAN_SCRIPT', symbol, null);
     res.status(200).json({ message: `Script ${symbol} unbanned successfully` });
   } catch (error) {

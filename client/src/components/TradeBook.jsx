@@ -13,10 +13,9 @@ import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 const getRowId = (row) => row.id;
 
-// Trade Book (fills) per GUI spec 6.2 - separate from Order Book, EXECUTED orders only.
-// There's no separate fills table yet (an order fills 100% or not at all in this engine,
-// so today a "trade" and an "EXECUTED order" are the same row) - filtered client-side from
-// the same /orders payload, same pattern OpenOrders uses for its PENDING-only filter.
+// Trade Book (fills) per GUI spec 6.2 - separate from Order Book. Sourced from the real
+// `fills` table (one row per actual execution, including each individual slice of a
+// partially filled order), not a filtered view of orders.
 export default function TradeBook() {
   const [tradeCount, setTradeCount] = useState(0);
   const [groupBy, setGroupBy] = useState(null); // null | 'token' | 'oms'
@@ -32,12 +31,11 @@ export default function TradeBook() {
 
   async function fetchTrades() {
     try {
-      const response = await apiFetch('/orders');
+      const response = await apiFetch('/orders/fills');
       const data = await response.json();
       if (response.ok) {
-        const executed = data.orders.filter((o) => o.status === 'EXECUTED');
-        syncGridRows(gridRef.current?.api, executed, getRowId);
-        setTradeCount(executed.length);
+        syncGridRows(gridRef.current?.api, data.fills, getRowId);
+        setTradeCount(data.fills.length);
       }
     } catch (err) {
       console.error('Failed to fetch trade book:', err);
@@ -55,7 +53,7 @@ export default function TradeBook() {
     { field: 'quantity', headerName: 'QTY', width: 80, cellStyle: { color: gridColors.primary } },
     { field: 'price', headerName: 'PRICE', width: 90, valueFormatter: (p) => `₹${Number(p.value).toFixed(2)}`, cellStyle: { color: gridColors.price } },
     {
-      field: 'executed_at', headerName: 'TIME', width: 150,
+      field: 'created_at', headerName: 'TIME', width: 150,
       valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleString() : '—'), cellStyle: { color: gridColors.muted, fontSize: '11px' }
     }
   ]);

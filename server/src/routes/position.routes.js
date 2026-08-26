@@ -12,6 +12,13 @@ router.get('/', authenticate, async (req, res) => {
     const userId = req.user.userId || req.user.id;
     const isRmsRole = req.user.role === 'RMS_ADMIN' || req.user.role === 'SUPER_ADMIN';
 
+    // Computed from fills (the immutable execution record), not from orders.status =
+    // 'EXECUTED' - a partially filled order's fills count toward the position even though
+    // the order row itself is still PARTIALLY_FILLED (or later CANCELLED for the remainder).
+    // avg_price is quantity-weighted across fills (not a plain AVG(price)), so a mix of
+    // small and large fills at different prices is represented proportionally - still a
+    // simplification versus true FIFO cost-basis accounting, but a meaningfully more
+    // correct one than before.
     // Grouped by (user_id, symbol) rather than symbol alone, even for the RMS/Super Admin
     // view - collapsing across users would erase per-trader ("OMS-wise") visibility, which
     // the spec requires the Net Positions grid to support.
@@ -20,9 +27,8 @@ router.get('/', authenticate, async (req, res) => {
           `SELECT
              user_id, symbol,
              SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) as net_qty,
-             AVG(price) as avg_price
-           FROM orders
-           WHERE status = 'EXECUTED'
+             SUM(quantity * price) / SUM(quantity) as avg_price
+           FROM fills
            GROUP BY user_id, symbol
            HAVING SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) <> 0`
         )
@@ -30,9 +36,9 @@ router.get('/', authenticate, async (req, res) => {
           `SELECT
              user_id, symbol,
              SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) as net_qty,
-             AVG(price) as avg_price
-           FROM orders
-          WHERE user_id = $1 AND status = 'EXECUTED'
+             SUM(quantity * price) / SUM(quantity) as avg_price
+           FROM fills
+           WHERE user_id = $1
            GROUP BY user_id, symbol
            HAVING SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) <> 0`,
           [userId]

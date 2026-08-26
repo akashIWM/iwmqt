@@ -30,7 +30,9 @@ export default function OpenOrders() {
       const response = await apiFetch('/orders');
       const data = await response.json();
       if (response.ok) {
-        const pending = data.orders.filter((o) => o.status === 'PENDING');
+        // Partially filled orders are still open (the remainder is live in the book) and
+        // belong here too, not just untouched PENDING ones.
+        const pending = data.orders.filter((o) => o.status === 'PENDING' || o.status === 'PARTIALLY_FILLED');
         // Transaction-based update (add/update/remove by row id), never a full rowData
         // replacement - per the AG Grid contract, this is required, not just a nicety.
         syncGridRows(gridRef.current?.api, pending, getRowId);
@@ -65,6 +67,11 @@ export default function OpenOrders() {
       cellStyle: (p) => ({ color: p.value === 'BUY' ? gridColors.buy : gridColors.sell, fontWeight: '700' })
     },
     { field: 'quantity', headerName: 'QTY', width: 70, enableCellChangeFlash: true, cellStyle: { color: gridColors.primary } },
+    {
+      headerName: 'REMAINING', width: 90, enableCellChangeFlash: true,
+      valueGetter: (p) => Number(p.data.quantity) - Number(p.data.filled_quantity),
+      cellStyle: { color: gridColors.primary }
+    },
     {
       field: 'price', headerName: 'PRICE', width: 85, enableCellChangeFlash: true,
       valueFormatter: (p) => (p.value ? `₹${p.value}` : 'MKT'), cellStyle: { color: gridColors.price }

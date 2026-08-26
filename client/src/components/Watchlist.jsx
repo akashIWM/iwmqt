@@ -153,7 +153,7 @@ export default function Watchlist() {
       <style>{GRID_THEME_CSS}</style>
 
       <div style={styles.header}>
-        <h4 style={styles.title}>SCRIPT WATCH</h4>
+        <h4 style={styles.title}>MARKET WATCH</h4>
         <div style={styles.headerRight}>
           <button style={styles.exportBtn} onClick={handleExportCsv}>Export CSV</button>
           <span style={styles.badge}>{connected ? '● LIVE FEED' : '○ DISCONNECTED'}</span>

@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../db/postgres.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { logAudit } from '../utils/audit.js';
+import { refreshOmsConfig } from '../services/rmsConfigCache.service.js';
 
 const router = express.Router();
 
@@ -16,14 +17,26 @@ router.use(authenticate, authorize('RMS_ADMIN', 'SUPER_ADMIN', 'COMPANY_ACCOUNT'
 router.get('/', async (req, res) => {
   try {
     const configResult = await query('SELECT * FROM oms_config WHERE id = 1');
+    // Updated to match the fills-table model: "executed" utilisation comes from fills (the
+    // immutable record of what actually happened), not orders.status = 'EXECUTED'; "pending"
+    // utilisation uses each order's remaining (quantity - filled_quantity) and includes
+    // PARTIALLY_FILLED orders, not just untouched PENDING ones.
     const utilisationResult = await query(`
       SELECT
-        (SELECT COALESCE(MAX(v), 0) FROM (SELECT SUM(quantity * price) AS v FROM orders WHERE status = 'PENDING' GROUP BY user_id) t1) AS max_open_order_value_used,
-        (SELECT COALESCE(MAX(v), 0) FROM (SELECT ABS(SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END)) AS v FROM orders WHERE status IN ('EXECUTED', 'PENDING') GROUP BY user_id, symbol) t2) AS max_position_qty_used,
-        (SELECT COALESCE(MAX(v), 0) FROM (SELECT SUM(quantity * price) AS v FROM orders WHERE status IN ('PENDING', 'EXECUTED') GROUP BY user_id) t3) AS max_exposure_value_used,
-        (SELECT COALESCE(SUM(quantity * price), 0) FROM orders WHERE status IN ('PENDING', 'EXECUTED')) AS global_exposure_value_used,
-        (SELECT COALESCE(MAX(v), 0) FROM (SELECT SUM(quantity * price) AS v FROM orders WHERE status = 'EXECUTED' GROUP BY user_id) t4) AS max_turnover_value_used,
-        (SELECT COALESCE(MAX(v), 0) FROM (SELECT COUNT(*) AS v FROM orders WHERE status = 'PENDING' GROUP BY user_id) t5) AS max_open_orders_count_used
+        (SELECT COALESCE(MAX(v), 0) FROM (SELECT SUM((quantity - filled_quantity) * price) AS v FROM orders WHERE status IN ('PENDING', 'PARTIALLY_FILLED') GROUP BY user_id) t1) AS max_open_order_value_used,
+        (SELECT COALESCE(MAX(v), 0) FROM (SELECT ABS(SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END)) AS v FROM fills GROUP BY user_id, symbol) t2) AS max_position_qty_used,
+        (SELECT COALESCE(MAX(v), 0) FROM (
+           SELECT
+             COALESCE((SELECT SUM((quantity - filled_quantity) * price) FROM orders o WHERE o.user_id = u.user_id AND status IN ('PENDING', 'PARTIALLY_FILLED')), 0)
+             + COALESCE((SELECT SUM(quantity * price) FROM fills f WHERE f.user_id = u.user_id), 0) AS v
+           FROM (SELECT DISTINCT user_id FROM orders) u
+         ) t3) AS max_exposure_value_used,
+        (SELECT
+           COALESCE((SELECT SUM((quantity - filled_quantity) * price) FROM orders WHERE status IN ('PENDING', 'PARTIALLY_FILLED')), 0)
+           + COALESCE((SELECT SUM(quantity * price) FROM fills), 0)
+        ) AS global_exposure_value_used,
+        (SELECT COALESCE(MAX(v), 0) FROM (SELECT SUM(quantity * price) AS v FROM fills GROUP BY user_id) t4) AS max_turnover_value_used,
+        (SELECT COALESCE(MAX(v), 0) FROM (SELECT COUNT(*) AS v FROM orders WHERE status IN ('PENDING', 'PARTIALLY_FILLED') GROUP BY user_id) t5) AS max_open_orders_count_used
     `);
 
     res.status(200).json({ config: configResult.rows[0], utilisation: utilisationResult.rows[0] });
@@ -67,6 +80,7 @@ router.put('/', authorize('RMS_ADMIN'), async (req, res) => {
       [...NUMERIC_FIELDS.map((field) => values[field]), req.user.userId]
     );
 
+    await refreshOmsConfig();
     await logAudit(
       req.user.userId,
       'OMS_CONFIG_UPDATE',
