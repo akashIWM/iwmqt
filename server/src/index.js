@@ -19,6 +19,7 @@ import auditRoutes from './routes/audit.routes.js';
 import companyRoutes from './routes/company.routes.js';
 import securityLimitsRoutes from './routes/security-limits.routes.js';
 import serversRoutes from './routes/servers.routes.js';
+import { refreshAllRmsCaches } from './services/rmsConfigCache.service.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -56,6 +57,10 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws/market-data' });
 
 initMarketDataSocket(wss);
+
+// Load the RMS config cache (oms_config, banned_scripts, kill_switches, security_limits)
+// before accepting traffic, so the very first order placement doesn't hit an empty cache.
+await refreshAllRmsCaches();
 
 server.listen(PORT, () => {
   console.log(`✅ iwmQT Backend Server running on http://localhost:${PORT}`);

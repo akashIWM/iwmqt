@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../db/postgres.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { logAudit } from '../utils/audit.js';
+import { refreshSecurityLimits } from '../services/rmsConfigCache.service.js';
 
 const router = express.Router();
 
@@ -34,6 +35,7 @@ router.put('/:symbol', async (req, res) => {
       [symbol, maxQty, maxValue, req.user.userId]
     );
 
+    await refreshSecurityLimits();
     await logAudit(req.user.userId, 'SECURITY_LIMIT_SET', symbol, `max_qty=${maxQty}, max_value=${maxValue}`);
     res.status(200).json({ message: `Limit set for ${symbol}`, limit: result.rows[0] });
   } catch (error) {
@@ -47,6 +49,7 @@ router.delete('/:symbol', async (req, res) => {
   try {
     const symbol = req.params.symbol.trim().toUpperCase();
     await query('DELETE FROM security_limits WHERE symbol = $1', [symbol]);
+    await refreshSecurityLimits();
     await logAudit(req.user.userId, 'SECURITY_LIMIT_REMOVED', symbol, null);
     res.status(200).json({ message: `Limit removed for ${symbol}` });
   } catch (error) {

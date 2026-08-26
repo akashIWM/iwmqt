@@ -27,6 +27,7 @@ export const gridColors = {
   price: '#a16207',
   pending: '#b45309',
   executed: '#2b8a3e',
+  partiallyFilled: '#245a9e',
   cancelled: '#627d98',
   rejected: '#c92a2a'
 };
@@ -34,6 +35,7 @@ export const gridColors = {
 export const statusColor = (status) => {
   switch (status) {
     case 'EXECUTED': return gridColors.executed;
+    case 'PARTIALLY_FILLED': return gridColors.partiallyFilled;
     case 'PENDING': return gridColors.pending;
     case 'CANCELLED': return gridColors.cancelled;
     case 'REJECTED': return gridColors.rejected;

@@ -4,10 +4,21 @@ import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { validateOrder } from '../utils/validators.js';
 import { getLtp, getExpiry, getToken } from '../services/marketData.service.js';
 import { opsRateLimit } from '../middleware/opsRateLimit.middleware.js';
+import { logAudit } from '../utils/audit.js';
+import { getOmsConfig, getBanReason, getGlobalKillSwitch, getUserKillSwitchReason, getSecurityLimit } from '../services/rmsConfigCache.service.js';
 
 const router = express.Router();
 
 const isRmsRole = (role) => role === 'RMS_ADMIN' || role === 'SUPER_ADMIN';
+
+// A blocked order used to leave zero compliance record - only successful fills were ever
+// audited. Every RMS/kill-switch/ban rejection now writes one ORDER_REJECTED entry (control
+// tag + the exact message shown to the trader) before responding, so "who tried what and
+// why it was blocked" is answerable from the audit log, not just from server logs.
+const rejectOrder = async (res, userId, symbol, controlTag, message) => {
+  await logAudit(userId, 'ORDER_REJECTED', symbol, `[${controlTag}] ${message}`);
+  return res.status(400).json({ message });
+};
 
 // GET /api/orders - RMS/Super Admin see all users' orders; everyone else sees only their own
 router.get('/', authenticate, async (req, res) => {
@@ -53,6 +64,25 @@ router.get('/events', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/orders/fills - Trade Book source: one row per actual fill (not per order), so
+// a partially filled order that filled in several slices shows each slice separately.
+// Same visibility split as GET / and /events.
+router.get('/fills', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+
+    const fills = isRmsRole(req.user.role)
+      ? await query(`SELECT * FROM fills ORDER BY created_at DESC LIMIT 200`)
+      : await query(`SELECT * FROM fills WHERE user_id = $1 ORDER BY created_at DESC LIMIT 200`, [userId]);
+
+    const enriched = fills.rows.map((row) => ({ ...row, token: getToken(row.symbol) }));
+    res.status(200).json({ fills: enriched });
+  } catch (error) {
+    console.error('Fetch Fills Error:', error);
+    res.status(500).json({ message: 'Internal server error fetching fills' });
+  }
+});
+
 // POST /api/orders/place
 // Spec: order entry is Trader-only - RMS Admin/PM/Company Account/Super Admin must not be able to place orders.
 router.post('/place', authenticate, authorize('TRADER'), opsRateLimit, async (req, res) => {
@@ -69,31 +99,29 @@ router.post('/place', authenticate, authorize('TRADER'), opsRateLimit, async (re
     const orderValue = numericQuantity * numericPrice;
 
     // --- RMS PRE-TRADE CHECKS (spec Section 8, control numbers noted per check) ---
-    const killSwitchCheck = await query(
-      `SELECT * FROM kill_switches WHERE scope = 'GLOBAL' OR (scope = 'USER' AND target_user_id = $1)`,
-      [userId]
-    );
-    const globalHalt = killSwitchCheck.rows.find((row) => row.scope === 'GLOBAL');
+    // Kill switches, ban list, and OMS config all come from the in-memory RMS config
+    // cache (rmsConfigCache.service.js) rather than a live query - this data only changes
+    // when an admin edits it, so there's no reason to hit Postgres for it on every order.
+    // The cache is refreshed the instant any of those admin writes happens, so it's never
+    // stale relative to the database.
+    const globalHalt = getGlobalKillSwitch();
     if (globalHalt) {
-      return res.status(400).json({
-        message: `Order Rejected: Trading is currently HALTED platform-wide by RMS. Reason: ${globalHalt.reason}`
-      });
+      return rejectOrder(res, userId, normalizedSymbol, 'KILL_SWITCH_GLOBAL',
+        `Order Rejected: Trading is currently HALTED platform-wide by RMS. Reason: ${globalHalt.reason}`);
     }
-    const userHalt = killSwitchCheck.rows.find((row) => row.scope === 'USER');
-    if (userHalt) {
-      return res.status(400).json({
-        message: `Order Rejected: Your trading access has been suspended by RMS. Reason: ${userHalt.reason}`
-      });
+    const userHaltReason = getUserKillSwitchReason(userId);
+    if (userHaltReason) {
+      return rejectOrder(res, userId, normalizedSymbol, 'KILL_SWITCH_USER',
+        `Order Rejected: Your trading access has been suspended by RMS. Reason: ${userHaltReason}`);
     }
 
-    const banCheck = await query('SELECT * FROM banned_scripts WHERE symbol = $1', [normalizedSymbol]);
-    if (banCheck.rows.length > 0) {
-      return res.status(400).json({
-        message: `Order Rejected: ${symbol} is currently BANNED by RMS risk controls. Reason: ${banCheck.rows[0].reason}`
-      });
+    const banReason = getBanReason(normalizedSymbol);
+    if (banReason) {
+      return rejectOrder(res, userId, normalizedSymbol, 'BANNED_SCRIPT',
+        `Order Rejected: ${symbol} is currently BANNED by RMS risk controls. Reason: ${banReason}`);
     }
 
-    const omsConfig = (await query('SELECT * FROM oms_config WHERE id = 1')).rows[0];
+    const omsConfig = getOmsConfig();
     const {
       max_order_quantity: maxOrderQuantity,
       max_order_value: maxOrderValue,
@@ -113,41 +141,44 @@ router.post('/place', authenticate, authorize('TRADER'), opsRateLimit, async (re
     if (ltp !== null) {
       const band = ltp * (Number(priceBandPct) / 100);
       if (numericPrice < ltp - band || numericPrice > ltp + band) {
-        return res.status(400).json({
-          message: `Order Rejected: Price Check - ${numericPrice} is outside the allowed ${priceBandPct}% band around LTP ${ltp}`
-        });
+        return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_1_4_PRICE_CHECK',
+          `Order Rejected: Price Check - ${numericPrice} is outside the allowed ${priceBandPct}% band around LTP ${ltp}`);
       }
     }
 
     // Control 2 (Quantity Limit Check)
     if (numericQuantity > Number(maxOrderQuantity)) {
-      return res.status(400).json({
-        message: `Order Rejected: Quantity Limit Check - ${numericQuantity} exceeds the RMS-configured limit of ${maxOrderQuantity}`
-      });
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_2_QUANTITY_LIMIT',
+        `Order Rejected: Quantity Limit Check - ${numericQuantity} exceeds the RMS-configured limit of ${maxOrderQuantity}`);
     }
     // Control 3 (Order Value Check)
     if (orderValue > Number(maxOrderValue)) {
-      return res.status(400).json({
-        message: `Order Rejected: Order Value Check - order value exceeds the RMS-configured limit of ${maxOrderValue}`
-      });
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_3_ORDER_VALUE',
+        `Order Rejected: Order Value Check - order value exceeds the RMS-configured limit of ${maxOrderValue}`);
     }
 
-    // Per-symbol position, for Control 8
+    // Per-symbol position, for Control 8. net_qty comes from fills (the immutable record
+    // of what actually executed) rather than orders.status = 'EXECUTED' - a partially
+    // filled or even a since-cancelled order can still have real fills on record.
+    // pending_qty uses each open order's remaining (quantity - filled_quantity), not its
+    // full original quantity, so an already-partially-filled order doesn't double-count.
     const positionRow = (await query(
       `SELECT
-         COALESCE(SUM(CASE WHEN status = 'EXECUTED' THEN (CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) ELSE 0 END), 0) AS net_qty,
-         COALESCE(SUM(CASE WHEN status = 'PENDING' THEN (CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END) ELSE 0 END), 0) AS pending_qty
-       FROM orders WHERE user_id = $1 AND symbol = $2`,
+         COALESCE((SELECT SUM(CASE WHEN side = 'BUY' THEN quantity ELSE -quantity END)
+                   FROM fills WHERE user_id = $1 AND symbol = $2), 0) AS net_qty,
+         COALESCE((SELECT SUM(CASE WHEN side = 'BUY' THEN (quantity - filled_quantity) ELSE -(quantity - filled_quantity) END)
+                   FROM orders WHERE user_id = $1 AND symbol = $2 AND status IN ('PENDING', 'PARTIALLY_FILLED')), 0) AS pending_qty`,
       [userId, normalizedSymbol]
     )).rows[0];
 
     // Per-user totals across all symbols, for Controls 6, 7, 9/11, 10 (user), 13
     const userTotalsRow = (await query(
       `SELECT
-         COALESCE(SUM(CASE WHEN status = 'PENDING' THEN quantity * price ELSE 0 END), 0) AS pending_value,
-         COALESCE(SUM(CASE WHEN status = 'EXECUTED' THEN quantity * price ELSE 0 END), 0) AS executed_value,
-         COUNT(*) FILTER (WHERE status = 'PENDING') AS pending_count
-       FROM orders WHERE user_id = $1`,
+         COALESCE((SELECT SUM((quantity - filled_quantity) * price) FROM orders
+                   WHERE user_id = $1 AND status IN ('PENDING', 'PARTIALLY_FILLED')), 0) AS pending_value,
+         COALESCE((SELECT SUM(quantity * price) FROM fills WHERE user_id = $1), 0) AS executed_value,
+         COALESCE((SELECT COUNT(*) FROM orders
+                   WHERE user_id = $1 AND status IN ('PENDING', 'PARTIALLY_FILLED')), 0) AS pending_count`,
       [userId]
     )).rows[0];
 
@@ -156,17 +187,15 @@ router.post('/place', authenticate, authorize('TRADER'), opsRateLimit, async (re
 
     // Control 8 (Position Limit Check)
     if (Math.abs(prospectivePosition) > Number(maxPositionQty)) {
-      return res.status(400).json({
-        message: `Order Rejected: Position Limit Check - resulting position ${prospectivePosition} exceeds the max position of ${maxPositionQty}`
-      });
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_8_POSITION_LIMIT',
+        `Order Rejected: Position Limit Check - resulting position ${prospectivePosition} exceeds the max position of ${maxPositionQty}`);
     }
 
     // Control 6 (Cumulative Open Order Value Check)
     const prospectiveOpenValue = Number(userTotalsRow.pending_value) + orderValue;
     if (prospectiveOpenValue > Number(maxOpenOrderValue)) {
-      return res.status(400).json({
-        message: `Order Rejected: Cumulative Open Order Value Check - open order value ${prospectiveOpenValue.toFixed(2)} exceeds the limit of ${maxOpenOrderValue}`
-      });
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_6_OPEN_ORDER_VALUE',
+        `Order Rejected: Cumulative Open Order Value Check - open order value ${prospectiveOpenValue.toFixed(2)} exceeds the limit of ${maxOpenOrderValue}`);
     }
 
     // Current exposure proxy shared by the margin and exposure checks below - pending +
@@ -177,57 +206,53 @@ router.post('/place', authenticate, authorize('TRADER'), opsRateLimit, async (re
     // Control 7 (Net Position vs. Available Margin Check)
     const marginRow = (await query('SELECT available_margin FROM users WHERE user_id = $1', [userId])).rows[0];
     if (marginRow && currentExposure > Number(marginRow.available_margin)) {
-      return res.status(400).json({
-        message: `Order Rejected: Net Position vs. Available Margin Check - exposure ${currentExposure.toFixed(2)} exceeds available margin of ${marginRow.available_margin}`
-      });
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_7_MARGIN',
+        `Order Rejected: Net Position vs. Available Margin Check - exposure ${currentExposure.toFixed(2)} exceeds available margin of ${marginRow.available_margin}`);
     }
 
     // Control 10 (Exposure Limit Check - user level)
     if (currentExposure > Number(maxExposureValue)) {
-      return res.status(400).json({
-        message: `Order Rejected: Exposure Limit Check - your exposure ${currentExposure.toFixed(2)} exceeds the user limit of ${maxExposureValue}`
-      });
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_10_EXPOSURE_USER',
+        `Order Rejected: Exposure Limit Check - your exposure ${currentExposure.toFixed(2)} exceeds the user limit of ${maxExposureValue}`);
     }
 
-    // Control 10 (Exposure Limit Check - global level)
+    // Control 10 (Exposure Limit Check - global level) - open remaining order value
+    // platform-wide, plus everything actually filled platform-wide (from fills).
     const globalExposureRow = (await query(
-      `SELECT COALESCE(SUM(quantity * price), 0) AS total_value FROM orders WHERE status IN ('PENDING', 'EXECUTED')`
+      `SELECT
+         COALESCE((SELECT SUM((quantity - filled_quantity) * price) FROM orders WHERE status IN ('PENDING', 'PARTIALLY_FILLED')), 0)
+         + COALESCE((SELECT SUM(quantity * price) FROM fills), 0) AS total_value`
     )).rows[0];
     const prospectiveGlobalExposure = Number(globalExposureRow.total_value) + orderValue;
     if (prospectiveGlobalExposure > Number(globalExposureValue)) {
-      return res.status(400).json({
-        message: `Order Rejected: Exposure Limit Check - platform-wide exposure would exceed the global limit of ${globalExposureValue}`
-      });
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_10_EXPOSURE_GLOBAL',
+        `Order Rejected: Exposure Limit Check - platform-wide exposure would exceed the global limit of ${globalExposureValue}`);
     }
 
     // Control 9 / 11 (Trading Limit Check / Turnover Limit Check - same cumulative executed value)
     const prospectiveTurnover = Number(userTotalsRow.executed_value) + orderValue;
     if (prospectiveTurnover > Number(maxTurnoverValue)) {
-      return res.status(400).json({
-        message: `Order Rejected: Turnover Limit Check - cumulative turnover ${prospectiveTurnover.toFixed(2)} exceeds the limit of ${maxTurnoverValue}`
-      });
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_9_11_TURNOVER',
+        `Order Rejected: Turnover Limit Check - cumulative turnover ${prospectiveTurnover.toFixed(2)} exceeds the limit of ${maxTurnoverValue}`);
     }
 
     // Control 12 (Security-Wise Limit Check) - only enforced when RMS has configured a limit for this symbol
-    const securityLimit = (await query('SELECT max_qty, max_value FROM security_limits WHERE symbol = $1', [normalizedSymbol])).rows[0];
+    const securityLimit = getSecurityLimit(normalizedSymbol);
     if (securityLimit) {
       if (numericQuantity > Number(securityLimit.max_qty)) {
-        return res.status(400).json({
-          message: `Order Rejected: Security-Wise Limit Check - quantity exceeds the ${symbol} limit of ${securityLimit.max_qty}`
-        });
+        return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_12_SECURITY_QTY',
+          `Order Rejected: Security-Wise Limit Check - quantity exceeds the ${symbol} limit of ${securityLimit.max_qty}`);
       }
       if (orderValue > Number(securityLimit.max_value)) {
-        return res.status(400).json({
-          message: `Order Rejected: Security-Wise Limit Check - order value exceeds the ${symbol} limit of ${securityLimit.max_value}`
-        });
+        return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_12_SECURITY_VALUE',
+          `Order Rejected: Security-Wise Limit Check - order value exceeds the ${symbol} limit of ${securityLimit.max_value}`);
       }
     }
 
     // Control 13 (Automated Execution Check) - caps outstanding unconfirmed orders per user
     if (Number(userTotalsRow.pending_count) >= Number(maxOpenOrdersCount)) {
-      return res.status(400).json({
-        message: `Order Rejected: Automated Execution Check - you already have ${userTotalsRow.pending_count} open orders, the maximum is ${maxOpenOrdersCount}`
-      });
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_13_AUTOMATED_EXECUTION',
+        `Order Rejected: Automated Execution Check - you already have ${userTotalsRow.pending_count} open orders, the maximum is ${maxOpenOrdersCount}`);
     }
     // --- END RMS CHECKS ---
 
@@ -263,8 +288,10 @@ router.put('/:id/cancel', authenticate, authorize('TRADER'), async (req, res) =>
     const { id } = req.params;
     const userId = req.user.userId || req.user.id;
 
+    // A partially filled order can still be cancelled - that stops any further fills on
+    // the remaining quantity, while the fills already recorded stay exactly as they are.
     const result = await query(
-      `UPDATE orders SET status = 'CANCELLED' WHERE id = $1 AND user_id = $2 AND status = 'PENDING' RETURNING *`,
+      `UPDATE orders SET status = 'CANCELLED' WHERE id = $1 AND user_id = $2 AND status IN ('PENDING', 'PARTIALLY_FILLED') RETURNING *`,
       [id, userId]
     );
 
@@ -273,10 +300,11 @@ router.put('/:id/cancel', authenticate, authorize('TRADER'), async (req, res) =>
     }
 
     const cancelled = result.rows[0];
+    const remainingQty = Number(cancelled.quantity) - Number(cancelled.filled_quantity);
     await query(
       `INSERT INTO order_events (order_id, user_id, symbol, order_type, quantity, price, event)
        VALUES ($1, $2, $3, $4, $5, $6, 'CANCELLED')`,
-      [cancelled.id, cancelled.user_id, cancelled.symbol, cancelled.type, cancelled.quantity, cancelled.price]
+      [cancelled.id, cancelled.user_id, cancelled.symbol, cancelled.type, remainingQty, cancelled.price]
     );
 
     res.status(200).json({ message: 'Order cancelled successfully', order: cancelled });

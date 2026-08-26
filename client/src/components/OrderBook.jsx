@@ -55,6 +55,7 @@ export default function OrderBook() {
       valueFormatter: (p) => p.value ? `₹${Number(p.value).toFixed(2)}` : 'MKT', cellStyle: { color: gridColors.price }
     },
     { field: 'quantity', headerName: 'QTY', width: 70, enableCellChangeFlash: true, cellStyle: { color: gridColors.primary } },
+    { field: 'filled_quantity', headerName: 'FILLED QTY', width: 90, enableCellChangeFlash: true, cellStyle: { color: gridColors.muted } },
     {
       field: 'side', headerName: 'SIDE', width: 65,
       cellStyle: (p) => ({ color: p.value === 'BUY' ? gridColors.buy : gridColors.sell, fontWeight: '700' })
