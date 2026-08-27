@@ -1,5 +1,6 @@
 import { query } from '../db/postgres.js';
 import { logAudit } from '../utils/audit.js';
+import { pushOrderUpdate, pushFillUpdate } from './wsHub.service.js';
 
 // Matches PENDING/PARTIALLY_FILLED LIMIT orders against a fresh LTP tick for one symbol.
 // A BUY fills once the market trades at or below the limit (you'd have paid your price or
@@ -43,10 +44,13 @@ export const matchPendingOrders = async (symbol, ltp) => {
   );
 
   for (const order of filled.rows) {
-    await query(
-      `INSERT INTO fills (order_id, user_id, symbol, side, quantity, price) VALUES ($1, $2, $3, $4, $5, $6)`,
+    const fill = (await query(
+      `INSERT INTO fills (order_id, user_id, symbol, side, quantity, price) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [order.id, order.user_id, order.symbol, order.side, order.this_fill_qty, ltp]
-    );
+    )).rows[0];
+
+    pushOrderUpdate(order.user_id, order);
+    pushFillUpdate(order.user_id, fill);
 
     await logAudit(
       order.user_id,

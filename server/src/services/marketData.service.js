@@ -1,4 +1,6 @@
 import { matchPendingOrders } from './executionEngine.service.js';
+import { identifyFromCookieHeader, registerClient, unregisterClient } from './wsHub.service.js';
+import { logMarketTicks } from './clickhouse/logger.js';
 
 // Initial Mock Ticker Master
 // expiry: weekly for index options (nearest Thursday), monthly for stock futures (last Thursday).
@@ -92,9 +94,30 @@ export const initMarketDataSocket = (wss) => {
     Promise.all(changes.map((inst) => matchPendingOrders(inst.symbol, inst.ltp))).catch((error) => {
       console.error('Execution engine - failed to match pending orders:', error.message);
     });
+
+    // Persist this tick cycle's changed instruments as one batch insert, not one row at a
+    // time - logMarketTicks() is itself fail-soft, and not awaited here for the same reason
+    // matching isn't: a slow write must never delay the next tick's broadcast.
+    logMarketTicks(changes.map((inst) => ({
+      symbol: inst.symbol,
+      ltp: inst.ltp,
+      bid: inst.bid,
+      ask: inst.ask,
+      volume: inst.volume,
+      change: inst.change,
+      p_change: inst.pChange,
+      high: inst.high,
+      low: inst.low,
+      seq
+    })));
   }, 600);
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
+    // Identify who owns this connection (if anyone) so order/fill push updates can be
+    // targeted correctly - see wsHub.service.js. An unauthenticated/expired connection
+    // still works fine for market data, it just never receives order pushes.
+    registerClient(ws, identifyFromCookieHeader(req.headers.cookie));
+
     // Send immediate snapshot on initial connect
     ws.send(snapshotPayload());
 
@@ -108,5 +131,7 @@ export const initMarketDataSocket = (wss) => {
         console.error('Market Data WS - malformed client message:', error.message);
       }
     });
+
+    ws.on('close', () => unregisterClient(ws));
   });
 };

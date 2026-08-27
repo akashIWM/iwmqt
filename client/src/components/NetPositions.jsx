@@ -4,6 +4,7 @@ import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
 import { syncGridRows } from '../utils/gridSync';
 import { useGridColumnPersistence } from '../hooks/useGridColumnPersistence';
+import { useOrderUpdates } from '../hooks/useOrderUpdates';
 import { GRID_THEME_CLASS, GRID_THEME_CSS, gridColors } from '../styles/gridTheme';
 
 ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
@@ -24,9 +25,16 @@ export default function NetPositions() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability
     fetchPositions();
-    const interval = setInterval(fetchPositions, 3000);
+    // Unlike the other grids, this poll isn't just a fallback net: P&L moves continuously
+    // with LTP (via market ticks), not only when an order/fill event fires, so it still
+    // needs a real cadence of its own rather than the long fallback interval used elsewhere.
+    const interval = setInterval(fetchPositions, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Refetch immediately on a fill/cancel too, instead of waiting up to 5s to see a new
+  // position appear.
+  useOrderUpdates(fetchPositions);
 
   async function fetchPositions() {
     try {

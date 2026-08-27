@@ -1,0 +1,309 @@
+================================================================================
+ iwmQT Trading Terminal - Setup Requirements & Onboarding Guide
+================================================================================
+# NOTE FOR THE READER: this is a Node.js project (React + Express), not Python -
+# there is nothing here to `pip install`. This file is named requirements.txt
+# because that's what was asked for, but it's a plain step-by-step setup guide,
+# not a package manager manifest. Dependency VERSIONS are already pinned in
+# client/package.json and server/package.json - this file tells you what to
+# install on your MACHINE (Node, Postgres, ClickHouse, etc.) before `npm install`
+# can even run, plus every step after that to get the app fully working.
+#
+# Follow the sections in order. Each one explains WHY the step exists, not just
+# what to type.
+
+
+--------------------------------------------------------------------------------
+ 1. SYSTEM REQUIREMENTS (install these on your machine first)
+--------------------------------------------------------------------------------
+
+# Required:
+#   - Node.js v20 or newer (this repo was built/tested on v24.19.0)
+#       Check with: node --version
+#       Get it from: https://nodejs.org/  (or use nvm: https://github.com/nvm-sh/nvm)
+#
+#   - npm (ships with Node automatically - no separate install)
+#
+#   - Git
+#       Check with: git --version
+#
+#   - PostgreSQL 15+ AND ClickHouse (24+) reachable somewhere - EITHER:
+#       (a) via Docker/Podman using the docker-compose.yml already in this repo
+#           (recommended - this is the easiest path, see Section 4), OR
+#       (b) natively installed and running on your machine already.
+#     You need ONE of these, not both.
+#
+# Optional (only needed for specific features, explained in Sections 4 and 5):
+#   - Docker Desktop, OR Docker Engine + docker-compose, OR Podman with the
+#     docker-compose plugin (any of these can run the docker-compose.yml)
+#   - A Zoho Mail account (for the OTP emails used by self-signup / forgot-password)
+
+
+--------------------------------------------------------------------------------
+ 2. CLONE THE REPOSITORY
+--------------------------------------------------------------------------------
+
+git clone <the repo's git URL - ask whoever shared this with you>
+cd iwmqt
+
+
+--------------------------------------------------------------------------------
+ 3. INSTALL DEPENDENCIES
+--------------------------------------------------------------------------------
+
+# This is a two-package-json repo: the backend (server/) and frontend (client/)
+# each have their own dependencies and must be installed separately.
+
+cd server
+npm install
+cd ../client
+npm install
+cd ..
+
+# What you just installed, backend (server/package.json):
+#   express            - the HTTP server / API framework
+#   pg                 - PostgreSQL client
+#   @clickhouse/client - ClickHouse client (used for auth-event and tick logging)
+#   ws                 - WebSocket server (live market data + order/fill push)
+#   jsonwebtoken       - session tokens (JWT)
+#   bcrypt             - password hashing
+#   cookie-parser      - reads the session cookie off incoming requests
+#   cors, helmet       - security/CORS middleware
+#   dotenv             - loads the .env file (Section 5)
+#   nodemailer         - sends OTP emails via Zoho SMTP
+
+# What you just installed, frontend (client/package.json):
+#   react, react-dom, react-router-dom - the UI framework + routing
+#   ag-grid-community, ag-grid-react   - every data grid in the app
+#   axios                              - HTTP client for talking to the backend
+#   vite                               - dev server + build tool
+#   eslint + plugins                   - linting (this repo has STRICT React
+#                                        Compiler-related lint rules - run
+#                                        `npm run lint` inside client/ before
+#                                        committing UI changes)
+
+
+--------------------------------------------------------------------------------
+ 4. START POSTGRES + CLICKHOUSE (pick ONE path)
+--------------------------------------------------------------------------------
+
+# --- Path A: Docker/Podman (recommended) -------------------------------------
+# The repo's docker-compose.yml already defines postgres, clickhouse, and an
+# optional pgbouncer service. From the repo root:
+
+docker compose up -d postgres clickhouse
+
+# (pgbouncer is optional connection pooling - skip it for local dev, see
+#  Section 9. If your machine uses Podman instead of Docker, the `docker`
+#  command usually still works via Podman's Docker-CLI-compatibility shim;
+#  if not, substitute `podman-compose` or `podman compose`.)
+
+# --- Path B: Already have Postgres/ClickHouse running natively ---------------
+# Just make sure you have:
+#   - a Postgres database + user matching what you'll put in server/.env
+#   - a ClickHouse instance reachable on the URL you'll put in server/.env
+# and skip straight to Section 5.
+
+
+--------------------------------------------------------------------------------
+ 5. ENVIRONMENT CONFIGURATION
+--------------------------------------------------------------------------------
+
+# Copy the example env files and fill them in. NEVER commit your real .env files
+# - they're already gitignored.
+
+cp server/.env.example server/.env
+cp client/.env.example client/.env
+
+# Open server/.env and set:
+#
+#   DATABASE_URL   - your Postgres connection string.
+#                    If you used docker-compose (Path A above) with the
+#                    default credentials baked into it, this is exactly:
+#                    postgres://iwmqt_user:iwmqt_password@localhost:5432/iwmqt
+#
+#   JWT_SECRET     - any long random string (this signs every session token -
+#                    treat it like a password; generate one with:
+#                    `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`)
+#
+#   CLICKHOUSE_URL / CLICKHOUSE_USER / CLICKHOUSE_PASSWORD / CLICKHOUSE_DATABASE
+#                  - defaults match docker-compose's clickhouse service as-is
+#                    (http://localhost:8123, user "default", no password,
+#                    database "iwmqt_events") - usually no changes needed.
+#
+#   ZOHO_EMAIL / ZOHO_PASSWORD / ZOHO_SMTP_HOST
+#                  - ONLY required for the self-signup and forgot-password
+#                    flows, which send a real OTP email. If you don't have
+#                    Zoho credentials handy, leave these as placeholders and
+#                    skip signup entirely - see Section 7 for how to get a
+#                    working login without it. Everything else in the app
+#                    works fine without this configured.
+#
+# client/.env should just work as-is for local dev (points at
+# http://localhost:3000/api).
+
+
+--------------------------------------------------------------------------------
+ 6. RUN THE DATABASE MIGRATIONS
+--------------------------------------------------------------------------------
+
+# If you used docker-compose (Path A), Postgres and ClickHouse each auto-run
+# every .sql file in migrations/postgres/ and migrations/clickhouse/ ONE TIME
+# ONLY, the very first time each container's data volume is created - so on a
+# completely fresh `docker compose up`, you likely have nothing more to do here.
+#
+# If you're on Path B (pre-existing native install), or the volumes already
+# existed from a previous run, apply them all yourself, IN ORDER (each file is
+# numbered for exactly this reason - later ones depend on earlier ones):
+
+# Postgres (13 migrations as of this writing):
+for f in migrations/postgres/*.sql; do
+  psql "$DATABASE_URL" -f "$f"
+done
+
+# ClickHouse (3 migrations as of this writing):
+for f in migrations/clickhouse/*.sql; do
+  curl -s "http://localhost:8123/?database=iwmqt_events" --data-binary @"$f"
+done
+
+# IMPORTANT - re-run safety is NOT uniform across these files (verified by
+# actually re-running all 13 against an already-migrated database):
+#   - 01_init.sql, 03_companies.sql, 04_rms_controls.sql predate this
+#     convention and WILL error if you run them a second time against a
+#     database that already has them applied (duplicate index/constraint/
+#     column errors) - each error is harmless (it just means that specific
+#     statement's change is already in place) but the script will stop, so
+#     don't be alarmed by them; just don't run 01/03/04 twice on purpose.
+#   - 02_rms_admin_modules.sql and 05_execution_engine.sql onward all use
+#     IF NOT EXISTS / IF EXISTS guards and are genuinely safe to re-run any
+#     number of times.
+# On a completely fresh database (the normal case - Path A's docker-compose
+# volumes, or a brand-new database in Path B), this distinction doesn't matter:
+# just run all 13 once, in order, and you're done.
+
+
+--------------------------------------------------------------------------------
+ 7. BOOTSTRAP YOUR FIRST LOGIN (important - read this before trying to log in)
+--------------------------------------------------------------------------------
+
+# The public /signup flow ALWAYS creates a TRADER account, and it requires a
+# real OTP email (Section 5's Zoho config) to complete. There is no self-signup
+# path to an admin role - by design, admin-level accounts are only ever created
+# by another admin (or, for the very first one, directly in the database).
+#
+# So: bootstrap ONE Super Admin account by hand, then use the app's own
+# "Add User" screen (User & Role Management, no OTP required) for every
+# account after that.
+
+# Step 1 - hash a password (run from inside server/, so bcrypt is available):
+cd server
+node -e "import('bcrypt').then(async (bcrypt) => console.log(await bcrypt.hash('YourStrongPassw0rd!', 12)))"
+# copy the printed hash string
+
+# Step 2 - insert the user directly (replace <HASH> with what you copied):
+psql "$DATABASE_URL" -c "
+INSERT INTO users (user_id, full_name, email, password_hash, role)
+VALUES ('admin', 'Initial Admin', 'admin@iwmquant.com', '<HASH>', 'SUPER_ADMIN');
+"
+# Note: the email domain is enforced elsewhere in the app for OTP-based flows,
+# but this direct insert bypasses that check - any email string works here,
+# though sticking to @iwmquant.com keeps things consistent with the rest of
+# the app's validation.
+
+# Step 3 - log in at http://localhost:5173/login with user_id "admin" and the
+# plaintext password you hashed in Step 1. From there, use User & Role
+# Management to create real Trader/PM/RMS Admin/Company Account logins - those
+# get a system-generated temp password shown once on screen, no email needed.
+
+
+--------------------------------------------------------------------------------
+ 8. START THE APP
+--------------------------------------------------------------------------------
+
+# Two processes, two terminals (or run one in the background):
+
+# Terminal 1 - backend (from repo root):
+cd server
+npm run dev
+# `npm run dev` uses `node --watch`, which restarts on file changes but can be
+# flaky about detecting saves on some filesystems/editors - if the server
+# doesn't seem to pick up a change, Ctrl+C and re-run `npm run dev`.
+# You should see:
+#   Backend Server running on http://localhost:3000
+#   WebSocket ready on ws://localhost:3000/ws/market-data
+
+# Terminal 2 - frontend (from repo root):
+cd client
+npm run dev
+# Vite will print a local URL, normally http://localhost:5173
+
+# Open http://localhost:5173 in a browser and log in with the account from
+# Section 7.
+
+
+--------------------------------------------------------------------------------
+ 9. VERIFY EVERYTHING IS WORKING
+--------------------------------------------------------------------------------
+
+# Quick health check (should return {"status":"Platform API is running"}):
+curl http://localhost:3000/api/health
+
+# Full smoke test once logged in as your bootstrapped admin:
+#   - Watchlist should show live-updating prices within a couple of seconds
+#     (confirms the WebSocket market-data feed is running)
+#   - User & Role Management should load the (currently one-row) user list
+#     (confirms Postgres is reachable)
+#   - Create a Trader account, log in as them, place an order from the Trade
+#     screen - it should show up in Order Book as PENDING and, within a few
+#     ticks, transition to PARTIALLY_FILLED/EXECUTED on its own (confirms the
+#     execution engine and the real-time push are both working)
+
+
+--------------------------------------------------------------------------------
+ 10. OPTIONAL: CONNECTION POOLING (PgBouncer)
+--------------------------------------------------------------------------------
+
+# Not needed for local dev with one backend process. If you want to run it
+# anyway (e.g. to test against a pooled connection, or because you're setting
+# up a shared/staging environment):
+
+docker compose up -d pgbouncer
+
+# Then point DATABASE_URL in server/.env at port 6432 instead of 5432 (same
+# user/password/database name - see the commented-out line already in
+# server/.env.example).
+
+
+--------------------------------------------------------------------------------
+ 11. TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+# "EADDRINUSE: address already in use :::3000"
+#   Something else (often a previous `npm run dev` you forgot about) is
+#   already listening on port 3000. Find and stop it:
+#     lsof -i :3000        (or: ss -ltnp | grep 3000)
+#     kill <the PID>
+
+# Backend won't pick up a code change even after saving
+#   `node --watch` can miss file-change events on some setups. Stop it
+#   (Ctrl+C) and run `npm run dev` again.
+
+# "connect ECONNREFUSED 127.0.0.1:8123" in the server logs
+#   ClickHouse isn't running. `docker compose up -d clickhouse` and retry -
+#   this is fail-soft by design (auth/tick logging just gets skipped with a
+#   console error), so the rest of the app keeps working even without it.
+
+# Signup / forgot-password says "Failed to send OTP"
+#   Your ZOHO_* credentials in server/.env aren't real. Either configure real
+#   Zoho SMTP credentials, or skip signup entirely - see Section 7.
+
+# "Only @iwmquant.com emails are authorized" on signup
+#   This domain restriction is intentional and hardcoded (see
+#   server/src/utils/validators.js). It does not apply to accounts created via
+#   Section 7's direct SQL insert or via the admin "Add User" screen.
+
+================================================================================
+ END OF GUIDE - if something here goes stale as the app evolves, update this
+ file in the same PR as whatever changed (new migration, new required env var,
+ new service in docker-compose.yml, etc.).
+================================================================================
