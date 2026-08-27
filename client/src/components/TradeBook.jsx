@@ -4,6 +4,7 @@ import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
 import { syncGridRows } from '../utils/gridSync';
 import { useGridColumnPersistence } from '../hooks/useGridColumnPersistence';
+import { useOrderUpdates } from '../hooks/useOrderUpdates';
 import { GRID_THEME_CLASS, GRID_THEME_CSS, gridColors } from '../styles/gridTheme';
 
 ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
@@ -25,9 +26,14 @@ export default function TradeBook() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability
     fetchTrades();
-    const interval = setInterval(fetchTrades, 3000);
+    // Push (below) is the primary update path now; this is a slow fallback net in case a
+    // push is missed (e.g. a brief WS reconnect gap), not the main refresh mechanism anymore.
+    const interval = setInterval(fetchTrades, 20000);
     return () => clearInterval(interval);
   }, []);
+
+  // Refetch immediately on any order/fill push instead of waiting for the fallback poll.
+  useOrderUpdates(fetchTrades);
 
   async function fetchTrades() {
     try {

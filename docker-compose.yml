@@ -12,6 +12,24 @@ services:
       - ./migrations/postgres:/docker-entrypoint-initdb.d
       - pgdata:/var/lib/postgresql/data
 
+  # Connection pooling in front of Postgres, transaction-mode. The app's own DATABASE_URL
+  # stays pointed directly at `postgres` for local dev (fewer moving parts) - point it at
+  # `pgbouncer:6432` instead (see server/.env.example) once concurrent connections actually
+  # warrant it, e.g. in a shared/staging environment. Same DB, same credentials, just proxied.
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    environment:
+      DATABASE_URL: postgres://iwmqt_user:iwmqt_password@postgres:5432/iwmqt
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 20
+      AUTH_TYPE: scram-sha-256
+      LISTEN_PORT: 6432
+    ports:
+      - "6432:6432"
+    depends_on:
+      - postgres
+
   clickhouse:
     image: clickhouse/clickhouse-server:latest
     environment:

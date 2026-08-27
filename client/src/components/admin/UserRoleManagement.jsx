@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
@@ -42,17 +42,23 @@ export default function UserRoleManagement() {
 
   const creatableRoles = currentUser.role === 'COMPANY_ACCOUNT' ? COMPANY_ACCOUNT_CREATABLE_ROLES : ALL_ROLES;
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  function loadUsers() {
+  // useCallback with an empty dependency array: this closes over nothing that changes
+  // (API_BASE_URL is a module-level constant, setUsers/setError/setLoading are the stable
+  // setter functions React guarantees), so a stable reference is both correct and lets the
+  // handlers below - and the columnDefs memo - list it as a dependency without recomputing
+  // on every render.
+  const loadUsers = useCallback(() => {
     setLoading(true);
     axios.get(`${API_BASE_URL}/admin/users`)
       .then((response) => setUsers(response.data.users))
       .catch(() => setError('Failed to load user data. Check permissions or network.'))
       .finally(() => setLoading(false));
-  }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadUsers();
+  }, [loadUsers]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -68,26 +74,41 @@ export default function UserRoleManagement() {
     }
   };
 
-  const handleRoleChange = async (userId, newRole) => {
+  // These three reload from the server rather than patching local state in place: the
+  // columnDefs memo below needs its own fresh `users` snapshot for the PM-options dropdown
+  // anyway (see its comment), so patching a second copy of the list here would just be two
+  // sources of truth to keep in sync for no benefit. loadUsers() is the single source.
+  // Wrapped in useCallback (dep: the now-stable loadUsers) so these have stable references
+  // too - satisfies columnDefs' exhaustive-deps honestly instead of suppressing the warning.
+  const handleRoleChange = useCallback(async (userId, newRole) => {
     try {
       await axios.put(`${API_BASE_URL}/admin/users/${userId}/role`, { role: newRole });
-      setUsers(users.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
+      loadUsers();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update role');
     }
-  };
+  }, [loadUsers]);
 
-  const handleStatusToggle = async (userId, currentStatus) => {
+  const handleStatusToggle = useCallback(async (userId, currentStatus) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
     try {
       await axios.put(`${API_BASE_URL}/admin/users/${userId}/status`, { status: newStatus });
-      setUsers(users.map((u) => (u.id === userId ? { ...u, status: newStatus } : u)));
+      loadUsers();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update status');
     }
-  };
+  }, [loadUsers]);
 
-  const handleForceReset = async (userId, displayUserId) => {
+  const handlePmChange = useCallback(async (userId, pmUserId) => {
+    try {
+      await axios.put(`${API_BASE_URL}/admin/users/${userId}/pm`, { pmUserId: pmUserId || null });
+      loadUsers();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to update desk assignment');
+    }
+  }, [loadUsers]);
+
+  const handleForceReset = useCallback(async (userId, displayUserId) => {
     if (!window.confirm(`Force-reset the password for ${displayUserId}? They'll need to set a new one on next login.`)) return;
     try {
       const response = await axios.post(`${API_BASE_URL}/admin/users/${userId}/reset-password`);
@@ -96,9 +117,16 @@ export default function UserRoleManagement() {
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to reset password');
     }
-  };
+  }, [loadUsers]);
 
-  const [columnDefs] = useState([
+  // useMemo, not the plain useState([...]) every other column set in this codebase uses -
+  // the PM dropdown's options depend on the current `users` list itself (who's a PM right
+  // now), which a frozen-at-first-render array could never see past its initial (pre-load,
+  // empty) snapshot. Recomputing per `users` change keeps that dropdown - and every other
+  // closure in here - honestly current instead of silently stale.
+  const columnDefs = useMemo(() => {
+    const pmOptions = users.filter((u) => u.role === 'PM');
+    return [
     { field: 'user_id', headerName: 'USER ID', width: 120, cellStyle: { fontWeight: '700', color: gridColors.primary } },
     { field: 'full_name', headerName: 'NAME', width: 160, cellStyle: { color: gridColors.primary } },
     { field: 'email', headerName: 'EMAIL', width: 200, cellStyle: { color: gridColors.muted } },
@@ -108,6 +136,17 @@ export default function UserRoleManagement() {
         <select style={styles.select} value={params.value} onChange={(e) => handleRoleChange(params.data.id, e.target.value)}>
           {ALL_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
         </select>
+      )
+    },
+    {
+      headerName: 'DESK (PM)', width: 170,
+      cellRenderer: (params) => (
+        params.data.role !== 'TRADER' ? <span style={{ color: gridColors.muted }}>—</span> : (
+          <select style={styles.select} value={params.data.pm_user_id || ''} onChange={(e) => handlePmChange(params.data.id, e.target.value)}>
+            <option value="">Unassigned</option>
+            {pmOptions.map((pm) => <option key={pm.user_id} value={pm.user_id}>{pm.user_id}</option>)}
+          </select>
+        )
       )
     },
     {
@@ -143,7 +182,8 @@ export default function UserRoleManagement() {
         </div>
       )
     }
-  ]);
+    ];
+  }, [users, handleRoleChange, handlePmChange, handleStatusToggle, handleForceReset]);
 
   const defaultColDef = useMemo(() => ({
     sortable: true,

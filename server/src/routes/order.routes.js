@@ -6,37 +6,51 @@ import { getLtp, getExpiry, getToken } from '../services/marketData.service.js';
 import { opsRateLimit } from '../middleware/opsRateLimit.middleware.js';
 import { logAudit } from '../utils/audit.js';
 import { getOmsConfig, getBanReason, getGlobalKillSwitch, getUserKillSwitchReason, getSecurityLimit } from '../services/rmsConfigCache.service.js';
+import { pushOrderUpdate } from '../services/wsHub.service.js';
+import { scopeByRole } from '../utils/visibility.js';
 
 const router = express.Router();
 
-const isRmsRole = (role) => role === 'RMS_ADMIN' || role === 'SUPER_ADMIN';
+// Control 13's "auto-restrict on abnormal activity" clause - a first pass using an actual
+// behavioral signal (repeated rejections in a short window) rather than only the static
+// open-order-count cap below. Same in-memory sliding-window shape as opsRateLimit.middleware.js;
+// tune the threshold/window once real usage patterns exist to calibrate against.
+const REJECTION_WINDOW_MS = 60_000;
+const REJECTION_THRESHOLD = 5;
+const rejectionLog = new Map(); // userId -> recent rejection timestamps
+
+const recentRejections = (userId) => {
+  const now = Date.now();
+  const recent = (rejectionLog.get(userId) || []).filter((ts) => now - ts < REJECTION_WINDOW_MS);
+  rejectionLog.set(userId, recent);
+  return recent;
+};
 
 // A blocked order used to leave zero compliance record - only successful fills were ever
 // audited. Every RMS/kill-switch/ban rejection now writes one ORDER_REJECTED entry (control
 // tag + the exact message shown to the trader) before responding, so "who tried what and
-// why it was blocked" is answerable from the audit log, not just from server logs.
+// why it was blocked" is answerable from the audit log, not just from server logs. Also
+// feeds the Control 13 rejection-rate tracker above, so repeated rejections build toward
+// the abnormal-activity threshold regardless of which specific control kept firing.
 const rejectOrder = async (res, userId, symbol, controlTag, message) => {
+  recentRejections(userId).push(Date.now());
   await logAudit(userId, 'ORDER_REJECTED', symbol, `[${controlTag}] ${message}`);
   return res.status(400).json({ message });
 };
 
-// GET /api/orders - RMS/Super Admin see all users' orders; everyone else sees only their own
+// GET /api/orders - RMS/Super Admin see everyone's orders, PM sees their desk's, everyone
+// else sees only their own.
 router.get('/', authenticate, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
+    const { clause, params } = scopeByRole(req.user.role, userId, 'o.user_id');
 
-    const userOrders = isRmsRole(req.user.role)
-      ? await query(
-          `SELECT o.*, u.pan, u.nnf_id, u.neat_id FROM orders o
-           JOIN users u ON u.user_id = o.user_id
-           ORDER BY o.created_at DESC LIMIT 200`
-        )
-      : await query(
-          `SELECT o.*, u.pan, u.nnf_id, u.neat_id FROM orders o
-           JOIN users u ON u.user_id = o.user_id
-           WHERE o.user_id = $1 ORDER BY o.created_at DESC`,
-          [userId]
-        );
+    const userOrders = await query(
+      `SELECT o.*, u.pan, u.nnf_id, u.neat_id FROM orders o
+       JOIN users u ON u.user_id = o.user_id
+       WHERE ${clause} ORDER BY o.created_at DESC LIMIT 200`,
+      params
+    );
 
     const orders = userOrders.rows.map((row) => ({ ...row, expiry: getExpiry(row.symbol), token: getToken(row.symbol) }));
 
@@ -48,14 +62,16 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // GET /api/orders/events - rolling buffer of order lifecycle events (Order Logs grid).
-// Same visibility split as GET / : RMS/Super Admin see everyone's, everyone else sees own.
+// Same visibility split as GET /.
 router.get('/events', authenticate, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
+    const { clause, params } = scopeByRole(req.user.role, userId);
 
-    const events = isRmsRole(req.user.role)
-      ? await query(`SELECT * FROM order_events ORDER BY created_at DESC LIMIT 200`)
-      : await query(`SELECT * FROM order_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT 200`, [userId]);
+    const events = await query(
+      `SELECT * FROM order_events WHERE ${clause} ORDER BY created_at DESC LIMIT 200`,
+      params
+    );
 
     res.status(200).json({ events: events.rows });
   } catch (error) {
@@ -70,10 +86,12 @@ router.get('/events', authenticate, async (req, res) => {
 router.get('/fills', authenticate, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
+    const { clause, params } = scopeByRole(req.user.role, userId);
 
-    const fills = isRmsRole(req.user.role)
-      ? await query(`SELECT * FROM fills ORDER BY created_at DESC LIMIT 200`)
-      : await query(`SELECT * FROM fills WHERE user_id = $1 ORDER BY created_at DESC LIMIT 200`, [userId]);
+    const fills = await query(
+      `SELECT * FROM fills WHERE ${clause} ORDER BY created_at DESC LIMIT 200`,
+      params
+    );
 
     const enriched = fills.rows.map((row) => ({ ...row, token: getToken(row.symbol) }));
     res.status(200).json({ fills: enriched });
@@ -97,6 +115,15 @@ router.post('/place', authenticate, authorize('TRADER'), opsRateLimit, async (re
     const numericQuantity = Number(quantity);
     const numericPrice = Number(price);
     const orderValue = numericQuantity * numericPrice;
+
+    // Control 13, abnormal-activity clause: checked first and cheaply (no DB work), before
+    // any of the real RMS checks run - a user who has just racked up several rejections in
+    // the last minute gets stopped immediately rather than re-running the full check chain
+    // on an order that's very likely to be rejected again anyway (or is probing the limits).
+    if (recentRejections(userId).length >= REJECTION_THRESHOLD) {
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_13_ABNORMAL_ACTIVITY',
+        `Order Rejected: Automated Execution Check - ${REJECTION_THRESHOLD}+ rejected orders in the last minute. Trading temporarily restricted; contact RMS if this persists.`);
+    }
 
     // --- RMS PRE-TRADE CHECKS (spec Section 8, control numbers noted per check) ---
     // Kill switches, ban list, and OMS config all come from the in-memory RMS config
@@ -272,6 +299,8 @@ router.post('/place', authenticate, authorize('TRADER'), opsRateLimit, async (re
       [newOrder.rows[0].id, userId, normalizedSymbol, type, quantity, price]
     );
 
+    pushOrderUpdate(userId, newOrder.rows[0]);
+
     res.status(201).json({
       message: 'Order placed successfully',
       order: newOrder.rows[0]
@@ -306,6 +335,8 @@ router.put('/:id/cancel', authenticate, authorize('TRADER'), async (req, res) =>
        VALUES ($1, $2, $3, $4, $5, $6, 'CANCELLED')`,
       [cancelled.id, cancelled.user_id, cancelled.symbol, cancelled.type, remainingQty, cancelled.price]
     );
+
+    pushOrderUpdate(cancelled.user_id, cancelled);
 
     res.status(200).json({ message: 'Order cancelled successfully', order: cancelled });
   } catch (error) {

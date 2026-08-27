@@ -9,13 +9,13 @@ export const getAllUsers = async (req, res) => {
   try {
     const result = req.user.role === 'COMPANY_ACCOUNT'
       ? await query(
-          `SELECT u.id, u.user_id, u.full_name, u.email, u.role, u.company_id, u.status, u.created_at, u.last_login_at, s.server_id
+          `SELECT u.id, u.user_id, u.full_name, u.email, u.role, u.company_id, u.status, u.created_at, u.last_login_at, u.pm_user_id, s.server_id
            FROM users u LEFT JOIN servers s ON s.assigned_trader = u.user_id
            WHERE u.company_id = $1 ORDER BY u.created_at DESC`,
           [req.user.companyId]
         )
       : await query(
-          `SELECT u.id, u.user_id, u.full_name, u.email, u.role, u.company_id, u.status, u.created_at, u.last_login_at, s.server_id
+          `SELECT u.id, u.user_id, u.full_name, u.email, u.role, u.company_id, u.status, u.created_at, u.last_login_at, u.pm_user_id, s.server_id
            FROM users u LEFT JOIN servers s ON s.assigned_trader = u.user_id
            ORDER BY u.created_at DESC`
         );
@@ -96,6 +96,39 @@ export const updateUserRole = async (req, res) => {
   } catch (error) {
     console.error("Error updating role:", error);
     res.status(500).json({ error: 'Failed to update user role.' });
+  }
+};
+
+// Assigns (or clears, with pmUserId: null) which PM owns a trader's desk. Only meaningful
+// for TRADER accounts - a PM/RMS Admin/etc. doesn't have "a PM" of their own.
+export const assignPm = async (req, res) => {
+  const { id } = req.params;
+  const { pmUserId } = req.body;
+
+  try {
+    const target = await query('SELECT user_id, role FROM users WHERE id = $1', [id]);
+    if (target.rows.length === 0) return res.status(404).json({ error: 'User not found.' });
+    if (target.rows[0].role !== 'TRADER') {
+      return res.status(400).json({ error: 'Only Trader accounts can be assigned to a PM desk.' });
+    }
+
+    if (pmUserId) {
+      const pm = await query(`SELECT role FROM users WHERE user_id = $1`, [pmUserId]);
+      if (pm.rows.length === 0 || pm.rows[0].role !== 'PM') {
+        return res.status(400).json({ error: 'pmUserId must be an existing user with the PM role.' });
+      }
+    }
+
+    const result = await query(
+      'UPDATE users SET pm_user_id = $1, updated_at = NOW() WHERE id = $2 RETURNING id, user_id, pm_user_id',
+      [pmUserId || null, id]
+    );
+
+    await logAudit(req.user.userId, 'USER_PM_ASSIGNED', result.rows[0].user_id, pmUserId ? `assigned to PM ${pmUserId}` : 'unassigned from desk');
+    res.status(200).json({ message: 'Desk assignment updated', user: result.rows[0] });
+  } catch (error) {
+    console.error('Assign PM Error:', error);
+    res.status(500).json({ error: 'Failed to update desk assignment.' });
   }
 };
 
