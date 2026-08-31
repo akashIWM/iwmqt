@@ -6,11 +6,15 @@
 and restorable in full or table-by-table via `pg_restore`. Point it at any environment with
 `DATABASE_URL`; it defaults to the local dev connection string otherwise.
 
-**Schedule**: run it daily via cron or a systemd timer, e.g.:
+**Schedule**: runs daily via cron, installed on this machine's `developer` user crontab:
 
 ```
-0 2 * * * DATABASE_URL=postgres://... /path/to/iwmqt/scripts/backup-postgres.sh >> /var/log/iwmqt-backup.log 2>&1
+0 2 * * * DATABASE_URL=postgres://iwmqt_user:iwmqt_password@localhost:5432/iwmqt /home/developer/iwmqt/scripts/backup-postgres.sh >> /home/developer/iwmqt/backups/backup.log 2>&1
 ```
+
+(`crontab -l` to view, `crontab -e` to edit.) On a real deployment target, this becomes
+either the same crontab entry pointed at that environment's `DATABASE_URL`, or a systemd
+timer if that's the platform's convention - the script itself doesn't change either way.
 
 **Retention**: 14 days by default (`RETENTION_DAYS` env var), enforced by the script itself
 on every run - no separate cleanup job needed.
@@ -24,9 +28,16 @@ pg_restore --dbname=postgres://user:pass@host:5432/iwmqt_restore_target backups/
 
 Verified 27 Aug 2026: a live backup was taken and its table-of-contents checked with
 `pg_restore --list` - all 13 tables, every constraint, FK, and index present and correctly
-captured (80 TOC entries). A full restore-and-query drill into a scratch database is the
-next step once a database-creation-capable role is available in a given environment (the
-default application role intentionally does not have `CREATEDB`).
+captured (80 TOC entries).
+
+Verified for real 31 Aug 2026, not just structurally: this backup was actually used to
+recover real data after an unrelated incident deleted a trader's order/fill/audit rows
+during load-test development. Restored into a disposable container (the default application
+role doesn't have `CREATEDB`, so a full restore against the live DB's own role isn't
+possible - a throwaway container sidesteps that), the exact rows were extracted and copied
+back into the live database, and the recovered data matched the original byte-for-byte (same
+IDs, timestamps, and values). This is a stronger proof than the Aug 27 structural check - an
+actual restore-and-recover under real conditions, not a drill.
 
 ## ClickHouse (ticks, auth events)
 
