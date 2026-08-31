@@ -53,3 +53,13 @@ export const pushOrderUpdate = (userId, order) => pushTo(userId, { type: 'ORDER_
 // Sent alongside pushOrderUpdate whenever a fill actually happens - Trade Book cares about
 // the fill event itself (a slice of an order executing), not just the parent order's status.
 export const pushFillUpdate = (userId, fill) => pushTo(userId, { type: 'FILL_UPDATE', fill });
+
+// Unlike order/fill pushes, a strategy/algo feed update isn't scoped to one trader - it's
+// broadcast to every authenticated connection, the same way market ticks are, since any
+// desk viewing the Strategy panel should see it live.
+export const broadcastStrategyUpdate = (update) => {
+  const payload = JSON.stringify({ type: 'STRATEGY_FEED_UPDATE', update });
+  for (const [ws] of clients) {
+    if (ws.readyState === 1) ws.send(payload);
+  }
+};

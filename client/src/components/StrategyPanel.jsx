@@ -1,15 +1,58 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { apiFetch } from '../api';
+import { useStrategyFeed } from '../hooks/useStrategyFeed';
+
+const MAX_FEED_ITEMS = 50;
 
 export default function StrategyPanel() {
   const [strategyName, setStrategyName] = useState('Nifty_Momentum_Breakout');
   const [lotSize, setLotSize] = useState(50);
   const [stopLoss, setStopLoss] = useState(25);
   const [isRunning, setIsRunning] = useState(false);
+  const [feed, setFeed] = useState([]);
+  const [commandStatus, setCommandStatus] = useState(null);
 
-  const handleToggleStrategy = (e) => {
+  // Sends the Deploy/Stop action to the backend, which relays it through the strategy-feed
+  // Python listener's control port to whichever external strategist/algo system is connected.
+  // Local isRunning only flips once the command is actually delivered - not optimistically -
+  // so "RUNNING" never lies about a system that never received the command.
+  const handleToggleStrategy = async (e) => {
     e.preventDefault();
-    setIsRunning(!isRunning);
+    const nextRunning = !isRunning;
+    setCommandStatus('sending');
+    try {
+      const response = await apiFetch('/strategy-feed/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: nextRunning ? 'DEPLOY_STRATEGY' : 'STOP_STRATEGY',
+          strategyName,
+          lotSize,
+          stopLoss
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setCommandStatus(data.error || 'Command failed');
+        return;
+      }
+      if (!data.delivered_to || data.delivered_to.length === 0) {
+        setCommandStatus('No connected strategist/algo system to receive this command');
+        return;
+      }
+      setIsRunning(nextRunning);
+      setCommandStatus(`Delivered to: ${data.delivered_to.join(', ')}`);
+    } catch (error) {
+      setCommandStatus(`Failed to reach backend: ${error.message}`);
+    }
   };
+
+  // Newest first, capped so a chatty external system can't grow this unbounded in memory.
+  const handleFeedUpdate = useCallback((update) => {
+    setFeed((prev) => [update, ...prev].slice(0, MAX_FEED_ITEMS));
+  }, []);
+
+  useStrategyFeed(handleFeedUpdate);
 
   const styles = {
     container: { fontFamily: '"Inter", sans-serif', color: '#f8fafc', fontSize: '12px' },
@@ -77,6 +120,56 @@ export default function StrategyPanel() {
         </div>
         <div style={{ fontSize: '11px', color: '#64748b' }}>
           Executes automated limit entries based on real-time WebSocket tick arrays.
+        </div>
+        {commandStatus && (
+          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px' }}>
+            {commandStatus}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: '20px' }}>
+        <div style={{ color: '#627d98', fontSize: '13px', marginBottom: '8px' }}>
+          External Feed ({feed.length}) - Strategist / Algo Systems
+        </div>
+        <div style={{
+          maxHeight: '260px',
+          overflowY: 'auto',
+          backgroundColor: '#1e293b',
+          border: '1px solid #334155',
+          borderRadius: '6px',
+          padding: feed.length ? '6px' : '12px'
+        }}>
+          {feed.length === 0 ? (
+            <div style={{ color: '#64748b', fontSize: '11px' }}>
+              No updates received yet. Waiting for a connection on the strategy-feed TCP listener.
+            </div>
+          ) : (
+            feed.map((update, i) => (
+              <div
+                key={`${update.received_at}-${i}`}
+                style={{
+                  padding: '8px',
+                  borderBottom: i === feed.length - 1 ? 'none' : '1px solid #334155',
+                  fontSize: '11px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+                  <span>{update.source_address}</span>
+                  <span>{new Date(update.received_at).toLocaleTimeString()}</span>
+                </div>
+                <pre style={{
+                  margin: '4px 0 0 0',
+                  color: '#e2e8f0',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  fontFamily: 'monospace'
+                }}>
+                  {JSON.stringify(update.payload, null, 2)}
+                </pre>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feature/dev]
+  pull_request:
+    branches: [main, feature/dev]
+
+jobs:
+  client:
+    name: Client - lint & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+      - name: Lint
+        working-directory: client
+        run: npm run lint
+      - name: Build
+        working-directory: client
+        run: npm run build
+
+  server:
+    name: Server - boot smoke test
+    runs-on: ubuntu-latest
+    # A real Postgres is required here, not a dummy connection string - index.js calls
+    # refreshAllRmsCaches() at startup (a real query against oms_config/banned_scripts/
+    # kill_switches/security_limits), so the process crashes on boot without a reachable,
+    # migrated database. ClickHouse is not needed: every write to it (tick logging, auth
+    # events) is deliberately fail-soft (try/catch, console.error only), so a missing
+    # ClickHouse never crashes the process - confirmed by reading logger.js.
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+      - name: Apply Postgres migrations
+        env:
+          PGPASSWORD: ci
+        run: |
+          for f in migrations/postgres/*.sql; do
+            echo "Applying $f"
+            psql -h localhost -U ci -d ci -f "$f"
+          done
+      - name: Boot server and check /api/health
+        working-directory: server
+        env:
+          PORT: 3000
+          DATABASE_URL: postgres://ci:ci@localhost:5432/ci
+          JWT_SECRET: ci_test_secret_not_for_real_use
+          CLICKHOUSE_URL: http://localhost:8123
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ''
+          CLICKHOUSE_DATABASE: ci
+        run: |
+          node src/index.js &
+          SERVER_PID=$!
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:3000/api/health > /dev/null; then
+              echo "Server responded to /api/health"
+              kill $SERVER_PID
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server never responded to /api/health"
+          kill $SERVER_PID 2>/dev/null || true
+          exit 1
