@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Today's Engineering Work</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+  :root {
+    --bg: #f7f9fc;
+    --surface: #ffffff;
+    --surface-alt: #eef3f8;
+    --border: #dbe4ee;
+    --ink: #14243b;
+    --ink-muted: #5b7086;
+    --ink-faint: #8ea0b3;
+    --accent: #c1352a;
+    --accent-soft: #fbeae8;
+    --teal: #0f8f83;
+    --teal-soft: #e6f6f4;
+    --blue: #2563a8;
+    --blue-soft: #eaf2fa;
+    --amber: #ad7a1e;
+    --amber-soft: #fbf3e2;
+    --shadow: 0 1px 2px rgba(20,36,59,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b1420;
+      --surface: #101d2c;
+      --surface-alt: #16283b;
+      --border: #26394d;
+      --ink: #e7edf5;
+      --ink-muted: #93a7bc;
+      --ink-faint: #5c728a;
+      --accent: #e2786c;
+      --accent-soft: #2a1a1a;
+      --teal: #3fcabb;
+      --teal-soft: #102b28;
+      --blue: #7cb0e8;
+      --blue-soft: #10233a;
+      --amber: #e3b15f;
+      --amber-soft: #2c2311;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b1420;
+    --surface: #101d2c;
+    --surface-alt: #16283b;
+    --border: #26394d;
+    --ink: #e7edf5;
+    --ink-muted: #93a7bc;
+    --ink-faint: #5c728a;
+    --accent: #e2786c;
+    --accent-soft: #2a1a1a;
+    --teal: #3fcabb;
+    --teal-soft: #102b28;
+    --blue: #7cb0e8;
+    --blue-soft: #10233a;
+    --amber: #e3b15f;
+    --amber-soft: #2c2311;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+
+  @page { size: A4; margin: 20mm 16mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Helvetica Neue", Arial, "Segoe UI", sans-serif;
+    font-size: 10.6pt;
+    line-height: 1.6;
+    margin: 0;
+  }
+  h1, h2, h3 { font-family: "Sora", "Helvetica Neue", Arial, sans-serif; text-wrap: balance; color: var(--ink); }
+  .eyebrow {
+    font-family: "JetBrains Mono", "Courier New", monospace;
+    font-size: 8.3pt;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  p { margin: 7px 0; color: var(--ink); }
+  ul, ol { margin: 7px 0; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  code {
+    font-family: "JetBrains Mono", "Courier New", monospace;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9pt;
+    color: var(--ink);
+  }
+
+  /* ---- Cover ---- */
+  .cover { min-height: 245mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+  .cover .eyebrow { font-size: 10pt; margin-bottom: 16px; }
+  .cover h1 { font-size: 33pt; margin: 0 0 10px 0; font-weight: 800; letter-spacing: -0.5px; line-height: 1.08; }
+  .cover .sub { font-size: 12.5pt; color: var(--ink-muted); max-width: 460px; margin-bottom: 34px; }
+  .cover hr { border: none; border-top: 2px solid var(--accent); width: 84px; margin: 0 0 28px 0; }
+  .cover .meta { font-family: "JetBrains Mono", "Courier New", monospace; font-size: 9pt; color: var(--ink-faint); }
+  .cover .meta div { margin-bottom: 4px; }
+  .stat-row { display: flex; gap: 30px; margin-top: 48px; flex-wrap: wrap; }
+  .stat .num { font-family: "Sora", sans-serif; font-size: 21pt; font-weight: 800; color: var(--accent); }
+  .stat .label { font-size: 8.2pt; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; }
+
+  /* ---- Sections ---- */
+  section { page-break-before: always; }
+  section:first-of-type { page-break-before: auto; }
+  .pagehead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  h2 { font-size: 18pt; margin: 2px 0 14px 0; padding-bottom: 10px; border-bottom: 2px solid var(--border); font-weight: 800; }
+  h3 { font-size: 12pt; margin: 20px 0 8px 0; font-weight: 700; }
+
+  .box {
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--teal);
+    background: var(--teal-soft);
+    padding: 10px 14px;
+    border-radius: 5px;
+    margin: 12px 0;
+    font-size: 9.6pt;
+    box-shadow: var(--shadow);
+  }
+  .box.warn { border-left-color: var(--accent); background: var(--accent-soft); }
+  .box.note { border-left-color: var(--blue); background: var(--blue-soft); }
+  .box.caution { border-left-color: var(--amber); background: var(--amber-soft); }
+  .box .tag {
+    display: block;
+    font-family: "JetBrains Mono", "Courier New", monospace;
+    font-size: 7.8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--teal);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .box.warn .tag { color: var(--accent); }
+  .box.note .tag { color: var(--blue); }
+  .box.caution .tag { color: var(--amber); }
+
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 14px 0; font-size: 9pt; }
+  th {
+    text-align: left; padding: 6px 10px; background: var(--surface-alt); color: var(--ink-muted);
+    font-weight: 700; border-bottom: 1px solid var(--border); font-size: 8.3pt;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; font-variant-numeric: tabular-nums; }
+  .table-wrap { overflow-x: auto; }
+
+  figure { margin: 16px 0; }
+  figure svg { width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+  figcaption { font-size: 8.6pt; color: var(--ink-muted); margin-top: 6px; text-align: center; }
+  svg text { fill: var(--ink); font-family: "JetBrains Mono", "Courier New", monospace; }
+  svg .dim { fill: var(--ink-faint); }
+  svg .accent-line { stroke: var(--accent); }
+  svg .accent-fill { fill: var(--accent); }
+  svg .accent-text { fill: var(--accent); font-weight: 600; }
+  svg .teal-line { stroke: var(--teal); }
+  svg .teal-fill { fill: var(--teal); }
+
+  .footer-note { font-size: 7.8pt; color: var(--ink-faint); margin-top: 30px; border-top: 1px solid var(--border); padding-top: 8px; }
+
+  .badge { display: inline-block; font-size: 7.5pt; font-weight: 700; padding: 2px 7px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .badge.done { background: var(--teal-soft); color: var(--teal); }
+  .badge.doc { background: var(--blue-soft); color: var(--blue); }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="eyebrow">Daily Engineering Report</div>
+  <h1>iwmQT Trading Terminal</h1>
+  <div class="sub">What shipped today, explained plainly - a new two-way data feed, proof the system holds up under real load, a mistake we caught and fixed, and the backup/redundancy picture.</div>
+  <hr>
+  <div class="meta">
+    <div>Prepared for: Senior Review</div>
+    <div>Date: 31 August 2026</div>
+    <div>Branch: feature/dev</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat"><div class="num">1</div><div class="label">New feature shipped</div></div>
+    <div class="stat"><div class="num">2</div><div class="label">Safety nets added</div></div>
+    <div class="stat"><div class="num">1</div><div class="label">Mistake caught &amp; fixed</div></div>
+    <div class="stat"><div class="num">18</div><div class="label">Rows recovered, byte-for-byte</div></div>
+  </div>
+</div>
+
+<!-- SECTION 1 -->
+<section>
+<div class="pagehead"><span class="eyebrow">01 — What Shipped Today</span></div>
+<h2>The short version</h2>
+
+<p>Four things happened today. In plain terms:</p>
+
+<ul>
+  <li><strong>A new pipe was built between our platform and outside algo/strategist systems</strong> - they can now send us live signals, and we can now send commands back to them, in real time.</li>
+  <li><strong>We proved the system doesn't fall over under real traffic</strong> - an automated check now runs on every code change, and we deliberately hammered the order-placement endpoint far past its advertised limit to see what actually breaks first.</li>
+  <li><strong>We made a mistake, caught it ourselves, fixed the real data, and closed the door on it happening again</strong> - explained in full in Section 4, because it's more useful to show than to bury.</li>
+  <li><strong>Backups are now actually running on a schedule</strong>, not just sitting there as a script - and the plan for full database redundancy is written down, waiting on one business decision.</li>
+</ul>
+
+<div class="box">
+  <span class="tag">Net effect</span>
+  Nothing about how traders, PMs, or RMS admins use the platform changed today. Everything below is either a brand-new capability (the algo feed) or the platform getting more trustworthy in the background.
+</div>
+</section>
+
+<!-- SECTION 2 -->
+<section>
+<div class="pagehead"><span class="eyebrow">02 — Talking to Outside Algo Systems</span></div>
+<h2>A two-way pipe to strategists and algo systems</h2>
+
+<p>Your ask was specific: when an outside strategist or algo system sends us an update, we should show it - and we should be able to send messages back to that system too, not just watch. Both directions are built and tested.</p>
+
+<h3>How it actually flows</h3>
+
+<figure role="img" aria-label="Diagram showing data flowing from an external algo system through a Python listener and the Node backend to the browser, and commands flowing back the other way when a trader clicks Deploy or Stop.">
+<svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowFwd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="teal-fill"></path>
+    </marker>
+    <marker id="arrowBack" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="accent-fill"></path>
+    </marker>
+  </defs>
+
+  <!-- boxes -->
+  <g font-size="11">
+    <rect x="10" y="90" width="150" height="60" rx="6" fill="none" class="teal-line" stroke-width="1.5"></rect>
+    <text x="85" y="115" text-anchor="middle">External Algo /</text>
+    <text x="85" y="130" text-anchor="middle">Strategist System</text>
+
+    <rect x="235" y="90" width="150" height="60" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+    <text x="310" y="112" text-anchor="middle">Python Listener</text>
+    <text x="310" y="127" text-anchor="middle" class="dim" font-size="9.5">port 9100 in / 9101 out</text>
+
+    <rect x="460" y="90" width="150" height="60" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+    <text x="535" y="112" text-anchor="middle">Node Backend</text>
+    <text x="535" y="127" text-anchor="middle" class="dim" font-size="9.5">/ingest · /command</text>
+
+    <rect x="630" y="90" width="120" height="60" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+    <text x="690" y="115" text-anchor="middle">Browser</text>
+    <text x="690" y="130" text-anchor="middle">Strategy Panel</text>
+  </g>
+
+  <!-- forward path (data in) -->
+  <line x1="160" y1="105" x2="230" y2="105" class="teal-line" stroke-width="1.5" marker-end="url(#arrowFwd)"></line>
+  <text x="195" y="95" text-anchor="middle" class="dim" font-size="8.7">sends signal</text>
+
+  <line x1="385" y1="105" x2="455" y2="105" class="teal-line" stroke-width="1.5" marker-end="url(#arrowFwd)"></line>
+  <text x="420" y="95" text-anchor="middle" class="dim" font-size="8.7">POST /ingest</text>
+
+  <line x1="610" y1="105" x2="625" y2="105" class="teal-line" stroke-width="1.5" marker-end="url(#arrowFwd)"></line>
+  <line x1="535" y1="90" x2="535" y2="60" class="teal-line" stroke-width="1.5"></line>
+  <line x1="535" y1="60" x2="690" y2="60" class="teal-line" stroke-width="1.5" marker-end="url(#arrowFwd)"></line>
+  <line x1="690" y1="60" x2="690" y2="85" class="teal-line" stroke-width="1.5"></line>
+  <text x="612" y="52" text-anchor="middle" class="dim" font-size="8.7">WebSocket broadcast</text>
+
+  <!-- reverse path (commands out) -->
+  <line x1="690" y1="155" x2="690" y2="200" class="accent-line" stroke-width="1.5"></line>
+  <line x1="690" y1="200" x2="535" y2="200" class="accent-line" stroke-width="1.5"></line>
+  <line x1="535" y1="200" x2="535" y2="155" class="accent-line" stroke-width="1.5" marker-end="url(#arrowBack)"></line>
+  <text x="612" y="215" text-anchor="middle" class="accent-text" font-size="8.7">clicks Deploy / Stop</text>
+
+  <line x1="455" y1="175" x2="385" y2="175" class="accent-line" stroke-width="1.5" marker-end="url(#arrowBack)"></line>
+  <text x="420" y="190" text-anchor="middle" class="accent-text" font-size="8.7">POST /command</text>
+  <line x1="535" y1="150" x2="535" y2="175" class="accent-line" stroke-width="1.5"></line>
+
+  <line x1="230" y1="175" x2="160" y2="175" class="accent-line" stroke-width="1.5" marker-end="url(#arrowBack)"></line>
+  <text x="195" y="190" text-anchor="middle" class="accent-text" font-size="8.7">writes to TCP socket</text>
+  <line x1="310" y1="150" x2="310" y2="175" class="accent-line" stroke-width="1.5"></line>
+
+  <!-- legend -->
+  <line x1="20" y1="235" x2="55" y2="235" class="teal-line" stroke-width="2"></line>
+  <text x="62" y="239" font-size="9">data coming in, shown live in the UI</text>
+  <line x1="330" y1="235" x2="365" y2="235" class="accent-line" stroke-width="2"></line>
+  <text x="372" y="239" font-size="9">commands going out, to the algo system</text>
+</svg>
+</figure>
+<figcaption style="margin-top:-8px;">Two independent paths sharing the same three middle hops - data flows in (teal) and commands flow out (red), each verified end-to-end with a live test message.</figcaption>
+
+<h3>What was actually tested, not just written</h3>
+<ul>
+  <li>A real TCP client sent a JSON signal in - it showed up correctly in the panel's live feed.</li>
+  <li>A trader's Deploy/Stop click was sent all the way through to a connected test client, which actually received it.</li>
+  <li>The shared secret between the Python listener and the backend was moved out of shell commands and into a local <code>.env</code> file, so it never lands in anyone's terminal history.</li>
+</ul>
+
+<div class="box note">
+  <span class="tag">Scope, honestly</span>
+  This only feeds the Strategy panel right now - it doesn't touch orders, positions, or anything else in the platform. If a similar feed is needed somewhere else later, it would need its own version of this same pattern.
+</div>
+</section>
+
+<!-- SECTION 3 -->
+<section>
+<div class="pagehead"><span class="eyebrow">03 — Proving It Holds Up</span></div>
+<h2>Does the system survive real traffic?</h2>
+
+<p>Two separate checks were built today to answer this, and both were run for real - not just written and assumed to work.</p>
+
+<h3>Every code change now checks itself</h3>
+<p>A pipeline now runs automatically on every push: it lints and builds the trader-facing app, and separately boots the real backend against a real (throwaway) database to confirm it actually starts and responds. Validated locally first - all 13 database setup steps ran cleanly, and the server answered its health check on the second try.</p>
+
+<h3>What happens if you push it past its limit?</h3>
+<p>The order-placement endpoint is supposed to allow at most 120 orders per second, per trader. We built a tool that fires real orders far past that number and watches what actually happens.</p>
+
+<div class="table-wrap">
+<table>
+<tr><th>Test</th><th>What we sent</th><th>What we found</th></tr>
+<tr><td>Right at the boundary</td><td>~360 orders/sec across 3 traders</td><td>The 120/sec limit held almost exactly - about 720 orders per trader got through in 6 seconds, which is the expected number</td></tr>
+<tr><td>Far past the limit</td><td>~700 orders/sec, sustained</td><td>A <em>different</em> safety control (max 50 orders open at once) tripped first, before the 120/sec limit ever became the bottleneck</td></tr>
+</table>
+</div>
+
+<h3>The real discovery</h3>
+<p>We expected the 120/sec speed limit to be the thing that stops a flood of orders. It isn't, usually - a second control (no trader may have more than 50 unfilled orders sitting open at once) trips first, because orders get submitted faster than the market can fill them within one price update.</p>
+
+<figure role="img" aria-label="Flow diagram showing one order's path under a fast burst: it is stopped by the 50-open-orders limit before the 120-per-second limit is ever reached, and repeated stops trigger a one-minute account lockout.">
+<svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowFwd2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+    </marker>
+  </defs>
+  <g font-size="10.5">
+    <rect x="10" y="65" width="140" height="55" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+    <text x="80" y="97" text-anchor="middle">Burst of orders</text>
+
+    <rect x="215" y="60" width="160" height="65" rx="6" fill="none" class="accent-line" stroke-width="2"></rect>
+    <text x="295" y="85" text-anchor="middle" class="accent-text">50 open orders?</text>
+    <text x="295" y="99" text-anchor="middle" class="accent-text" font-size="9.5">← trips first, in practice</text>
+
+    <rect x="440" y="8" width="180" height="58" rx="6" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.55"></rect>
+    <text x="530" y="30" text-anchor="middle" opacity="0.65">120/sec limit</text>
+    <text x="530" y="43" text-anchor="middle" class="dim" font-size="8.5" opacity="0.65">rarely the bottleneck</text>
+    <text x="530" y="55" text-anchor="middle" class="dim" font-size="8.5" opacity="0.65">(only reached if this holds)</text>
+
+    <rect x="440" y="130" width="180" height="55" rx="6" fill="none" class="accent-line" stroke-width="2"></rect>
+    <text x="530" y="153" text-anchor="middle" class="accent-text">5 rejections in 60s?</text>
+    <text x="530" y="167" text-anchor="middle" class="accent-text" font-size="9.5">→ account locked 1 min</text>
+  </g>
+
+  <line x1="150" y1="92" x2="210" y2="92" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrowFwd2)"></line>
+  <line x1="375" y1="78" x2="435" y2="40" class="accent-line" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.6" marker-end="url(#arrowFwd2)"></line>
+  <line x1="375" y1="110" x2="435" y2="150" class="accent-line" stroke-width="1.5" marker-end="url(#arrowFwd2)"></line>
+</svg>
+</figure>
+<figcaption style="margin-top:-8px;">Under a fast burst, the open-orders limit (red) trips before the speed limit ever gets a chance to - and repeated trips lock the account out entirely for the rest of that minute.</figcaption>
+
+<div class="box">
+  <span class="tag">Why this is good news</span>
+  These controls are supposed to work together, and today's test proved they do - a flood of orders gets stopped fast, from more than one direction, with no crashes and no slowdown (response times stayed under 10 milliseconds even at 700 orders/sec).
+</div>
+</section>
+
+<!-- SECTION 4 -->
+<section>
+<div class="pagehead"><span class="eyebrow">04 — A Mistake, Caught and Fixed</span></div>
+<h2>What went wrong, and what it means</h2>
+
+<p>While building the load test in Section 3, its cleanup step deleted 2 real orders (and their related records) that belonged to a real trader account - not test data. This is reported in full because it's the kind of thing that needs to be visible, not because it was left unresolved.</p>
+
+<h3>What happened</h3>
+<figure role="img" aria-label="Before and after comparison: the original test reused a real trader account, so its cleanup step deleted that trader's entire order history; the fixed version only ever creates disposable throwaway accounts, so cleanup can never reach real data.">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg">
+  <g font-size="10.5">
+    <text x="10" y="24" class="accent-text" font-weight="600">Before</text>
+    <rect x="10" y="34" width="330" height="42" rx="5" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+    <text x="175" y="59" text-anchor="middle">Test reused a real trader's account</text>
+
+    <rect x="10" y="94" width="330" height="42" rx="5" fill="none" class="accent-line" stroke-width="1.8"></rect>
+    <text x="175" y="112" text-anchor="middle" class="accent-text">Cleanup: delete everything for that user</text>
+    <text x="175" y="126" text-anchor="middle" class="accent-text" font-size="9">→ wiped 2 real orders + history</text>
+
+    <text x="380" y="24" class="teal-line" fill="currentColor" font-weight="600" style="fill:var(--teal)">After</text>
+    <rect x="380" y="34" width="330" height="42" rx="5" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+    <text x="545" y="59" text-anchor="middle">Test always creates a fresh, disposable account</text>
+
+    <rect x="380" y="94" width="330" height="42" rx="5" fill="none" class="teal-line" stroke-width="1.8"></rect>
+    <text x="545" y="112" text-anchor="middle" class="teal-fill" style="fill:var(--teal)">Cleanup: only that disposable account</text>
+    <text x="545" y="126" text-anchor="middle" style="fill:var(--teal)" font-size="9">→ real data physically out of reach</text>
+
+    <rect x="10" y="160" width="700" height="46" rx="5" fill="none" class="teal-line" stroke-width="1.3" stroke-dasharray="2,3"></rect>
+    <text x="360" y="180" text-anchor="middle" font-size="9.7">Hard guard added: cleanup now refuses to run at all if any account</text>
+    <text x="360" y="195" text-anchor="middle" font-size="9.7">in scope isn't one it created itself - this mistake is now structurally impossible.</text>
+  </g>
+</svg>
+</figure>
+<figcaption style="margin-top:-8px;">The fix isn't "be more careful" - it's that the dangerous option no longer exists in the code.</figcaption>
+
+<h3>How it was caught and fixed, same session</h3>
+<ol>
+  <li>A row count didn't add up during routine verification - checked it immediately instead of assuming it was fine.</li>
+  <li>Confirmed 2 real orders (and their fills, history, and audit trail) had been deleted.</li>
+  <li>Restored all 18 affected rows from the nightly backup, byte-for-byte - same IDs, same timestamps, same values, verified against the original.</li>
+  <li>Rewrote the test tool so it can never touch a real account again, with a hard check that refuses to run if it ever tries.</li>
+</ol>
+
+<div class="box caution">
+  <span class="tag">Why this belongs in the report</span>
+  This is also the strongest real-world proof yet that the backup system actually works - not a structural check this time, but an actual recovery of actual deleted data, verified to match exactly.
+</div>
+</section>
+
+<!-- SECTION 5 -->
+<section>
+<div class="pagehead"><span class="eyebrow">05 — Backup &amp; Redundancy</span></div>
+<h2>What's real now, what's still a plan</h2>
+
+<table>
+<tr><th>Item</th><th>Status</th><th>What that means</th></tr>
+<tr><td>Nightly backup</td><td><span class="badge done">Running</span></td><td>Runs automatically every night at 2am, keeps 14 days, confirmed on the schedule itself (not just written to run)</td></tr>
+<tr><td>Restore capability</td><td><span class="badge done">Proven</span></td><td>Actually used to recover real data today (Section 4) - the strongest possible proof it works</td></tr>
+<tr><td>Redundancy (zero-downtime failover)</td><td><span class="badge doc">Documented</span></td><td>Written up in full, but not built - it depends on a decision that hasn't been made yet (see below)</td></tr>
+</table>
+
+<div class="box note">
+  <span class="tag">Why redundancy is waiting, not stalled</span>
+  Backup answers "can we get the data back." Redundancy answers "does trading keep working if the database server dies right now." That second one depends entirely on where this eventually gets deployed - a managed cloud database (AWS, GCP, Azure) gets you this as a setting, almost for free; self-hosting means building it by hand with dedicated tooling. Building the self-hosted version now would likely be thrown away once that decision is made, so the plan is written and ready, not built blind.
+</div>
+</section>
+
+<!-- SECTION 6 -->
+<section>
+<div class="pagehead"><span class="eyebrow">06 — Next</span></div>
+<h2>What's left from here</h2>
+
+<ul>
+  <li><strong>Uptime alerting</strong> - notify someone the instant the backend goes down. Blocked on the same thing as redundancy: there's no public URL yet for an external monitor to watch, since nothing is deployed publicly.</li>
+  <li><strong>Secrets management</strong> - move credentials out of local <code>.env</code> files into a real secrets manager, once a deployment target is chosen.</li>
+  <li><strong>The deployment decision itself</strong> - this is now the one thing blocking the most remaining engineering work. Everything above that's "documented, not built" turns into a short, concrete task the moment it's made.</li>
+</ul>
+
+<div class="footer-note">
+iwmQT Trading Terminal — Daily Engineering Report — 31 August 2026 — branch <code>feature/dev</code>.
+</div>
+</section>
+
+</body>
+</html>

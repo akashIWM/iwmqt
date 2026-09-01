@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Aaj Ke Files Aur Changes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+  :root {
+    --bg: #f7f9fc; --surface: #ffffff; --surface-alt: #eef3f8; --border: #dbe4ee;
+    --ink: #14243b; --ink-muted: #5b7086; --ink-faint: #8ea0b3;
+    --accent: #c1352a; --accent-soft: #fbeae8;
+    --teal: #0f8f83; --teal-soft: #e6f6f4;
+    --blue: #2563a8; --blue-soft: #eaf2fa;
+    --amber: #ad7a1e; --amber-soft: #fbf3e2;
+    --shadow: 0 1px 2px rgba(20,36,59,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b1420; --surface: #101d2c; --surface-alt: #16283b; --border: #26394d;
+      --ink: #e7edf5; --ink-muted: #93a7bc; --ink-faint: #5c728a;
+      --accent: #e2786c; --accent-soft: #2a1a1a;
+      --teal: #3fcabb; --teal-soft: #102b28;
+      --blue: #7cb0e8; --blue-soft: #10233a;
+      --amber: #e3b15f; --amber-soft: #2c2311;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b1420; --surface: #101d2c; --surface-alt: #16283b; --border: #26394d;
+    --ink: #e7edf5; --ink-muted: #93a7bc; --ink-faint: #5c728a;
+    --accent: #e2786c; --accent-soft: #2a1a1a;
+    --teal: #3fcabb; --teal-soft: #102b28;
+    --blue: #7cb0e8; --blue-soft: #10233a;
+    --amber: #e3b15f; --amber-soft: #2c2311;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+  @page { size: A4; margin: 20mm 16mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: "Helvetica Neue", Arial, "Segoe UI", sans-serif; font-size: 10.4pt; line-height: 1.62; margin: 0; }
+  h1, h2, h3 { font-family: "Sora", "Helvetica Neue", Arial, sans-serif; text-wrap: balance; color: var(--ink); }
+  .eyebrow { font-family: "JetBrains Mono", "Courier New", monospace; font-size: 8.3pt; letter-spacing: 1.2px; text-transform: uppercase; color: var(--accent); }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  code { font-family: "JetBrains Mono", "Courier New", monospace; background: var(--surface-alt); border: 1px solid var(--border); padding: 1px 5px; border-radius: 3px; font-size: 8.8pt; color: var(--ink); }
+
+  .cover { min-height: 245mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+  .cover .eyebrow { font-size: 10pt; margin-bottom: 16px; }
+  .cover h1 { font-size: 30pt; margin: 0 0 10px 0; font-weight: 800; letter-spacing: -0.5px; line-height: 1.12; }
+  .cover .sub { font-size: 12pt; color: var(--ink-muted); max-width: 470px; margin-bottom: 30px; }
+  .cover hr { border: none; border-top: 2px solid var(--accent); width: 84px; margin: 0 0 26px 0; }
+  .cover .meta { font-family: "JetBrains Mono", "Courier New", monospace; font-size: 9pt; color: var(--ink-faint); }
+  .cover .meta div { margin-bottom: 4px; }
+  .stat-row { display: flex; gap: 30px; margin-top: 40px; flex-wrap: wrap; }
+  .stat .num { font-family: "Sora", sans-serif; font-size: 20pt; font-weight: 800; color: var(--accent); }
+  .stat .label { font-size: 8pt; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.7px; margin-top: 2px; }
+
+  section { page-break-before: always; }
+  section:first-of-type { page-break-before: auto; }
+  .pagehead { margin-bottom: 6px; }
+  h2 { font-size: 17pt; margin: 2px 0 12px 0; padding-bottom: 9px; border-bottom: 2px solid var(--border); font-weight: 800; }
+  h3 { font-size: 11pt; margin: 4px 0 2px 0; font-weight: 700; }
+
+  .filecard { border: 1px solid var(--border); border-radius: 6px; margin: 12px 0; overflow: hidden; box-shadow: var(--shadow); background: var(--surface); }
+  .filecard .fhead { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; background: var(--surface-alt); border-bottom: 1px solid var(--border); }
+  .filecard .fpath { font-family: "JetBrains Mono", "Courier New", monospace; font-size: 9.3pt; font-weight: 600; }
+  .filecard .fbody { padding: 10px 14px; font-size: 9.4pt; }
+  .filecard .fbody h4 { font-size: 8.3pt; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-muted); margin: 9px 0 3px 0; font-weight: 700; }
+  .filecard .fbody h4:first-child { margin-top: 0; }
+  .filecard .fbody p { margin: 2px 0; }
+  .filecard .fbody ul { margin: 2px 0; padding-left: 18px; }
+
+  .badge { display: inline-block; font-size: 7.3pt; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .badge.new { background: var(--teal-soft); color: var(--teal); }
+  .badge.changed { background: var(--amber-soft); color: var(--amber); }
+
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 14px 0; font-size: 8.9pt; }
+  th { text-align: left; padding: 6px 9px; background: var(--surface-alt); color: var(--ink-muted); font-weight: 700; border-bottom: 1px solid var(--border); font-size: 8.1pt; text-transform: uppercase; letter-spacing: 0.3px; }
+  td { padding: 6px 9px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .table-wrap { overflow-x: auto; }
+
+  .box { border: 1px solid var(--border); border-left: 4px solid var(--teal); background: var(--teal-soft); padding: 10px 14px; border-radius: 5px; margin: 12px 0; font-size: 9.4pt; box-shadow: var(--shadow); }
+  .box.warn { border-left-color: var(--accent); background: var(--accent-soft); }
+  .box.note { border-left-color: var(--blue); background: var(--blue-soft); }
+  .box .tag { display: block; font-family: "JetBrains Mono", "Courier New", monospace; font-size: 7.6pt; text-transform: uppercase; letter-spacing: 0.6px; color: var(--teal); margin-bottom: 4px; font-weight: 600; }
+  .box.warn .tag { color: var(--accent); }
+  .box.note .tag { color: var(--blue); }
+
+  figure { margin: 14px 0; }
+  figure svg { width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+  figcaption { font-size: 8.4pt; color: var(--ink-muted); margin-top: 6px; text-align: center; }
+  svg text { fill: var(--ink); font-family: "JetBrains Mono", "Courier New", monospace; }
+  svg .dim { fill: var(--ink-faint); }
+  svg .teal-line { stroke: var(--teal); } svg .teal-fill { fill: var(--teal); }
+  svg .accent-line { stroke: var(--accent); } svg .accent-fill { fill: var(--accent); }
+
+  .footer-note { font-size: 7.7pt; color: var(--ink-faint); margin-top: 26px; border-top: 1px solid var(--border); padding-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="eyebrow">Technical File-by-File Report</div>
+  <h1>Aaj Kaunse Files Bane, Aur Kyun</h1>
+  <div class="sub">Har naye file/folder ka purpose, banane ke steps, use hui logic, aur purane code mein kya-kya badlav hua uski wajah se - sab kuch ek jagah.</div>
+  <hr>
+  <div class="meta">
+    <div>Prepared for: Team Reference</div>
+    <div>Date: 31 August 2026</div>
+    <div>Branch: feature/dev</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat"><div class="num">8</div><div class="label">Naye files/folders</div></div>
+    <div class="stat"><div class="num">5</div><div class="label">Purane files mein badlav</div></div>
+    <div class="stat"><div class="num">815</div><div class="label">Lines add hui (git diff se)</div></div>
+  </div>
+</div>
+
+<!-- SECTION: QUICK SUMMARY -->
+<section>
+<div class="pagehead"><span class="eyebrow">01 — Ek Nazar Mein</span></div>
+<h2>Sab kuch, ek table mein</h2>
+
+<p>Yeh saari list <code>git diff</code> se nikaali gayi hai - guess ya yaadasht se nahi, isliye 100% accurate hai.</p>
+
+<h3 style="margin-top:16px;">Naye files/folders (8)</h3>
+<div class="table-wrap">
+<table>
+<tr><th>File</th><th>Ek line mein purpose</th></tr>
+<tr><td><code>strategy-feed/server.py</code></td><td>Python TCP server - bahar ke algo systems se connect hota hai</td></tr>
+<tr><td><code>strategy-feed/requirements.txt</code></td><td>Python dependencies ki list</td></tr>
+<tr><td><code>strategy-feed/.env.example</code></td><td>Secret config ka template</td></tr>
+<tr><td><code>server/src/routes/strategyFeed.routes.js</code></td><td>Naye API endpoints - data andar/bahar</td></tr>
+<tr><td><code>client/src/hooks/useStrategyFeed.js</code></td><td>React hook - live updates sunne ke liye</td></tr>
+<tr><td><code>.github/workflows/ci.yml</code></td><td>Har push par automatic check chalata hai</td></tr>
+<tr><td><code>server/scripts/load-test-orders.js</code></td><td>System ko load ke saath test karne ka tool</td></tr>
+<tr><td><code>docs/REDUNDANCY_AND_FAILOVER.md</code></td><td>Database redundancy ki planning documentation</td></tr>
+</table>
+</div>
+
+<h3>Purane files mein badlav (5)</h3>
+<div class="table-wrap">
+<table>
+<tr><th>File</th><th>Ek line mein kya badla</th></tr>
+<tr><td><code>server/src/index.js</code></td><td>Naya route register kiya (2 lines)</td></tr>
+<tr><td><code>server/src/services/wsHub.service.js</code></td><td>Naya "broadcast to everyone" function add hua</td></tr>
+<tr><td><code>client/src/components/StrategyPanel.jsx</code></td><td>Deploy/Stop button ab asli backend call karta hai + live feed dikhata hai</td></tr>
+<tr><td><code>server/.env.example</code></td><td>2 naye config variables add hue</td></tr>
+<tr><td><code>docs/BACKUP_AND_RETENTION.md</code></td><td>Real cron schedule + real restore-proof add hua</td></tr>
+</table>
+</div>
+</section>
+
+<!-- SECTION: NEW FILES DETAIL 1 -->
+<section>
+<div class="pagehead"><span class="eyebrow">02 — Naye Files: Strategy Feed System</span></div>
+<h2>Yeh 5 files ek saath kaam karti hain</h2>
+
+<p>Yeh aapke senior ke ask ka jawab hai - "outside algo/strategist systems se connect karo, unka data dikhao, aur unhe command bhi bhej sako." Isko banane ke liye 5 files chahiye hui - 3 Python side par, 2 Node backend side par, plus frontend mein 1 hook.</p>
+
+<div class="filecard">
+  <div class="fhead"><span class="fpath">strategy-feed/server.py</span><span class="badge new">Naya</span></div>
+  <div class="fbody">
+    <h4>Kya hai</h4>
+    <p>Python mein likha ek TCP server - yeh literally woh cheez hai jo senior ne ask ki thi.</p>
+    <h4>Kyun banaya</h4>
+    <p>Bahar ke algo/strategist systems ko ek jagah chahiye thi jahan woh apna live signal bhej sakein, aur jahan se unhe command (Deploy/Stop) mil sake.</p>
+    <h4>Steps jo follow kiye</h4>
+    <ul>
+      <li><code>asyncio</code> use kiya - ek saath multiple systems connect ho sakein, ek ke wait mein doosra na ruke</li>
+      <li>Protocol simple rakha: har message ek line, JSON format mein - kisi bhi language se bhejna easy</li>
+      <li>Ek alag HTTP "control port" (9101) bhi banaya - backend se ulta command bhejne ke liye</li>
+      <li>Pehle terminal mein secret type karna padta tha - baad mein <code>python-dotenv</code> add kiya taaki secret <code>.env</code> file se load ho, kabhi terminal history mein na jaaye</li>
+    </ul>
+    <h4>Logic</h4>
+    <p>Do independent direction hain isi file mein: (1) TCP se data aata hai → console par print → backend ko forward. (2) Backend se command aata hai (HTTP) → jis TCP client se connected hai use likh diya jaata hai. Dono ek hi process mein saath-saath chalte hain, ek dusre ko block nahi karte.</p>
+  </div>
+</div>
+
+<div class="filecard">
+  <div class="fhead"><span class="fpath">strategy-feed/requirements.txt + .env.example</span><span class="badge new">Naya</span></div>
+  <div class="fbody">
+    <h4>Kya hai</h4>
+    <p><code>requirements.txt</code> mein Python packages ki list (<code>aiohttp</code> - HTTP calls ke liye, <code>python-dotenv</code> - secret load karne ke liye). <code>.env.example</code> ek template hai jo dikhata hai kya-kya config chahiye, real secret ke bina.</p>
+    <h4>Kyun banaya</h4>
+    <p>Har naye Python project ki tarah - dependencies aur config ka ek standard, safe tareeka chahiye tha.</p>
+  </div>
+</div>
+</section>
+
+<!-- SECTION: NEW FILES DETAIL 2 -->
+<section>
+<div class="pagehead"><span class="eyebrow">02 — Naye Files: Strategy Feed System (aage)</span></div>
+<h2>Backend aur frontend ka hissa</h2>
+
+<div class="filecard">
+  <div class="fhead"><span class="fpath">server/src/routes/strategyFeed.routes.js</span><span class="badge new">Naya</span></div>
+  <div class="fbody">
+    <h4>Kya hai</h4>
+    <p>2 naye API endpoints: <code>POST /api/strategy-feed/ingest</code> (Python se data andar aata hai) aur <code>POST /api/strategy-feed/command</code> (trader se command bahar jaata hai).</p>
+    <h4>Steps jo follow kiye</h4>
+    <ul>
+      <li><code>/ingest</code>: normal login se protect nahi kiya (kyunki yeh Python server se aata hai, kisi insaan se nahi) - iske bajaye ek shared secret header check kiya</li>
+      <li><code>/command</code>: normal trader login se protect kiya (<code>authenticate</code> + <code>authorize('TRADER')</code>), same pattern jo order-placement mein pehle se use ho raha hai</li>
+    </ul>
+    <h4>Logic (ek important detail)</h4>
+    <p>Secret check mein: agar server par secret set hi nahi hai, to request ko reject karna hai, allow nahi. Yeh isliye zaroori hai kyunki agar galti se secret ka env variable set hona bhool jaaye, aur code sirf "header === secret" check kare, to dono undefined ho jaate aur match ho jaata - matlab bina kisi secret ke koi bhi data bhej sakta. Isliye pehle check hai "secret set hai ya nahi", tabhi match dekha jaata hai.</p>
+  </div>
+</div>
+
+<div class="filecard">
+  <div class="fhead"><span class="fpath">client/src/hooks/useStrategyFeed.js</span><span class="badge new">Naya</span></div>
+  <div class="fbody">
+    <h4>Kya hai</h4>
+    <p>Ek React hook jo WebSocket se live updates sunta hai, jab bhi Strategy Panel khula ho.</p>
+    <h4>Steps jo follow kiye</h4>
+    <p>Naya pattern nahi banaya - pehle se ek similar hook tha (<code>useOrderUpdates.js</code>, orders/fills ke liye), usi ka structure copy kiya: ek shared WebSocket connection, jo sirf tab khulti hai jab koi component use kar raha ho, aur band ho jaati hai jab koi nahi.</p>
+    <h4>Logic</h4>
+    <p>Aane wale message ka <code>type</code> field check karta hai - sirf <code>"STRATEGY_FEED_UPDATE"</code> wale messages ko aage bhejta hai, baaki (market ticks, order updates) ignore karta hai. Isse ek hi WebSocket connection kai alag-alag cheezon ke liye reuse ho jaata hai.</p>
+  </div>
+</div>
+
+<div class="box note">
+  <span class="tag">Yeh sab ek dusre se connected kaise hain</span>
+  Agla page (Section 03) mein ek diagram hai jo dikhata hai in files ka aapas mein connection, aur purane files mein kya badlav hua isi wajah se.
+</div>
+</section>
+
+<!-- SECTION: INTEGRATION DIAGRAM -->
+<section>
+<div class="pagehead"><span class="eyebrow">03 — Purane Code Mein Changes, Aur Kyun</span></div>
+<h2>Naye files ne purane code ko kaise touch kiya</h2>
+
+<p>Koi bhi naya feature hawa mein nahi chalta - use existing app se connect karna padta hai. Yahan exactly wahi 3 jagah hain jahan purana code badla, aur kis naye file ki wajah se.</p>
+
+<figure role="img" aria-label="Diagram showing how the new strategy feed files connect into the existing app: strategyFeed.routes.js is registered in index.js, calls broadcastStrategyUpdate in wsHub.service.js, and useStrategyFeed.js is used inside StrategyPanel.jsx.">
+<svg viewBox="0 0 740 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+    </marker>
+  </defs>
+
+  <g font-size="10.5">
+    <rect x="20" y="20" width="220" height="46" rx="6" fill="none" class="teal-line" stroke-width="1.8"></rect>
+    <text x="130" y="48" text-anchor="middle">strategy-feed/server.py</text>
+    <text x="255" y="48" class="dim" font-size="9" text-anchor="start"></text>
+    <text x="248" y="30" class="dim" font-size="8.7"></text>
+    <text x="248" y="48" class="teal-fill" font-size="9" text-anchor="start">← naya file</text>
+
+    <rect x="20" y="105" width="220" height="46" rx="6" fill="none" class="teal-line" stroke-width="1.8"></rect>
+    <text x="130" y="133" text-anchor="middle">strategyFeed.routes.js</text>
+    <text x="248" y="133" class="teal-fill" font-size="9" text-anchor="start">← naya file</text>
+
+    <rect x="300" y="65" width="200" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+    <text x="400" y="93" text-anchor="middle">index.js</text>
+
+    <rect x="300" y="150" width="200" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+    <text x="400" y="173" text-anchor="middle">wsHub.service.js</text>
+    <text x="400" y="188" text-anchor="middle" class="dim" font-size="8.5">+ broadcastStrategyUpdate()</text>
+
+    <rect x="20" y="230" width="220" height="46" rx="6" fill="none" class="teal-line" stroke-width="1.8"></rect>
+    <text x="130" y="258" text-anchor="middle">useStrategyFeed.js</text>
+    <text x="248" y="258" class="teal-fill" font-size="9" text-anchor="start">← naya file</text>
+
+    <rect x="560" y="150" width="160" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+    <text x="640" y="173" text-anchor="middle">StrategyPanel.jsx</text>
+    <text x="640" y="188" text-anchor="middle" class="dim" font-size="8.5">(existing, updated)</text>
+  </g>
+
+  <!-- server.py -> routes.js -->
+  <line x1="130" y1="66" x2="130" y2="103" stroke="currentColor" stroke-width="1.5" marker-end="url(#arr)"></line>
+  <text x="140" y="88" font-size="8.6" class="dim">HTTP calls</text>
+
+  <!-- routes.js -> index.js -->
+  <line x1="240" y1="118" x2="298" y2="90" stroke="currentColor" stroke-width="1.5" marker-end="url(#arr)"></line>
+  <text x="250" y="102" font-size="8.6" class="dim">registered in</text>
+
+  <!-- routes.js -> wsHub -->
+  <line x1="240" y1="140" x2="298" y2="168" stroke="currentColor" stroke-width="1.5" marker-end="url(#arr)"></line>
+  <text x="248" y="158" font-size="8.6" class="dim">calls broadcast()</text>
+
+  <!-- wsHub -> StrategyPanel (via websocket, dashed) -->
+  <line x1="500" y1="173" x2="558" y2="173" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr)"></line>
+  <text x="505" y="165" font-size="8.6" class="dim">WebSocket</text>
+
+  <!-- useStrategyFeed -> StrategyPanel -->
+  <line x1="240" y1="253" x2="558" y2="188" stroke="currentColor" stroke-width="1.5" marker-end="url(#arr)"></line>
+  <text x="350" y="235" font-size="8.6" class="dim">used inside</text>
+</svg>
+</figure>
+<figcaption>Teal boxes = aaj ke naye files. Safed boxes = purane files jinme badlav hua, kyunki inhe naye files se connect karna zaroori tha.</figcaption>
+
+<div class="filecard">
+  <div class="fhead"><span class="fpath">server/src/index.js</span><span class="badge changed">Badla</span></div>
+  <div class="fbody">
+    <p><strong>Kya badla:</strong> 2 lines add hui - <code>import strategyFeedRoutes</code> aur <code>app.use('/api/strategy-feed', ...)</code></p>
+    <p><strong>Kis wajah se:</strong> <code>strategyFeed.routes.js</code> naya file bana - koi bhi naya route file bina register kiye kaam nahi karta</p>
+  </div>
+</div>
+
+<div class="filecard">
+  <div class="fhead"><span class="fpath">server/src/services/wsHub.service.js</span><span class="badge changed">Badla</span></div>
+  <div class="fbody">
+    <p><strong>Kya badla:</strong> Naya function <code>broadcastStrategyUpdate()</code> add hua - message ko HAR connected user ko bhejta hai</p>
+    <p><strong>Kis wajah se:</strong> <code>strategyFeed.routes.js</code> ko is function ki zarurat thi - pehle se jo functions the woh sirf ek specific user ko bhejte the, "sabko bhejo" wala function nahi tha</p>
+  </div>
+</div>
+
+<div class="filecard">
+  <div class="fhead"><span class="fpath">client/src/components/StrategyPanel.jsx</span><span class="badge changed">Badla</span></div>
+  <div class="fbody">
+    <p><strong>Kya badla:</strong> Deploy/Stop button ab real API call karta hai (pehle sirf local state change hota tha), plus naya "External Feed" section</p>
+    <p><strong>Kis wajah se:</strong> <code>useStrategyFeed.js</code> hook aur naya <code>/command</code> endpoint - dono ka use yahin hua</p>
+  </div>
+</div>
+
+<div class="filecard">
+  <div class="fhead"><span class="fpath">server/.env.example</span><span class="badge changed">Badla</span></div>
+  <div class="fbody">
+    <p><strong>Kya badla:</strong> <code>STRATEGY_FEED_SECRET</code> aur <code>STRATEGY_FEED_CONTROL_URL</code> add hue</p>
+    <p><strong>Kis wajah se:</strong> Python server aur Node backend ke beech secret match hona chahiye, aur backend ko Python ka control-port URL pata hona chahiye</p>
+  </div>
+</div>
+</section>
+
+<!-- SECTION: OTHER TOOLS -->
+<section>
+<div class="pagehead"><span class="eyebrow">04 — Baaki 3 Naye Files</span></div>
+<h2>Yeh teeno independent tools hain - app ke andar import nahi hote</h2>
+
+<p>In teeno ka app ke chalte hue code se koi seedha connection nahi hai - inhe "tools" ki tarah samjho, jo app ke bahar se app ko check/verify/document karte hain.</p>
+
+<div class="filecard">
+  <div class="fhead"><span class="fpath">.github/workflows/ci.yml</span><span class="badge new">Naya</span></div>
+  <div class="fbody">
+    <h4>Kya hai</h4>
+    <p>GitHub Actions ka CI/CD pipeline - har push par automatically 2 jobs chalata hai.</p>
+    <h4>Kyun banaya</h4>
+    <p>Pehle koi automatic check nahi tha. Agar galti wala code push ho jaaye, kisi ko pata nahi chalta jab tak manually test na kare.</p>
+    <h4>Steps</h4>
+    <ul>
+      <li>"client" job: lint check + production build</li>
+      <li>"server" job: ek throwaway Postgres database spin up karta hai (GitHub ke apne feature se), saare migrations run karta hai, phir asli server ko us par boot karke <code>/api/health</code> check karta hai</li>
+    </ul>
+    <h4>Logic</h4>
+    <p>Dummy connection string se test nahi kiya - kyunki server startup par hi ek real database query chalti hai (<code>refreshAllRmsCaches</code>). Isliye ek asli, fresh Postgres chahiye tha CI mein bhi, warna test jhoothi confidence deta.</p>
+  </div>
+</div>
+
+<div class="filecard">
+  <div class="fhead"><span class="fpath">server/scripts/load-test-orders.js</span><span class="badge new">Naya</span></div>
+  <div class="fbody">
+    <h4>Kya hai</h4>
+    <p>Ek tool jo order-placement API ko bahut fast, bahut saare requests bhejke test karta hai.</p>
+    <h4>Kyun banaya</h4>
+    <p>NSE ka rule hai max 120 orders/second per trader - lekin kabhi test nahi kiya tha ki asal load mein system kya karta hai.</p>
+    <h4>Steps</h4>
+    <ul>
+      <li>Disposable (use-and-throw) test trader accounts banata hai</li>
+      <li>Un accounts ke liye seedha JWT token banata hai (login process se guzre bina, taaki test fast chale)</li>
+      <li>Ek saath bahut saare orders bhejta hai, result record karta hai (kitne accept/reject hue, latency kitni thi)</li>
+      <li>Test ke baad apna banaya hua saara data khud delete kar deta hai</li>
+    </ul>
+    <h4>Logic - aur ek zaroori baat</h4>
+    <p>Pehle version mein ek badi galti thi - agar kaafi trader accounts already the, to woh unhi ko reuse kar leta tha testing ke liye. Cleanup step phir us account ka SAARA data delete kar deta - test data ke saath-saath real data bhi. Yeh asal mein hua bhi (Section 05 dekho). Fix karne ke baad, ab yeh <strong>hamesha naye disposable accounts</strong> hi banata hai, aur cleanup se pehle ek hard check karta hai - agar list mein koi bhi account "disposable" na ho, to poora cleanup hi cancel ho jaata hai. Matlab ab yeh galti dobara ho hi nahi sakti.</p>
+  </div>
+</div>
+
+<div class="filecard">
+  <div class="fhead"><span class="fpath">docs/REDUNDANCY_AND_FAILOVER.md</span><span class="badge new">Naya</span></div>
+  <div class="fbody">
+    <h4>Kya hai</h4>
+    <p>Documentation - agar database server hi crash ho jaaye to kya hoga, uski planning.</p>
+    <h4>Kyun banaya</h4>
+    <p>Aapne pucha "database backup aur redundancy kaise fix karein" - backup to already tha, lekin redundancy (zero-downtime failover) bilkul nahi tha.</p>
+    <h4>Logic - kyun sirf documentation, code nahi</h4>
+    <p>Redundancy banane ke do rasta hain: (a) cloud database (jaise AWS RDS) use karo - yeh sirf ek setting/toggle jitna simple hai, (b) khud host karo - iske liye Patroni/repmgr jaisi tooling chahiye, jo kaafi zyada kaam hai. Konsa rasta lena hai, yeh depend karta hai ek decision par jo abhi tak hua hi nahi - deployment kahan hoga. Aapne khud kaha "abhi sirf plan likho, kuch build mat karo" - kyunki galat rasta pehle build karna time waste ho sakta tha.</p>
+  </div>
+</div>
+</section>
+
+<!-- SECTION: THE INCIDENT -->
+<section>
+<div class="pagehead"><span class="eyebrow">05 — Ek Zaroori Baat</span></div>
+<h2>Ek galti hui thi, isliye poora sach yahan hai</h2>
+
+<p><code>load-test-orders.js</code> banate waqt, uske pehle version ne ek real trader account (<code>Trader1</code>) ko test ke liye reuse kar liya. Test khatam hone ke baad cleanup step ne us account ka SAARA data delete kar diya - jisme 2 asli, real orders bhi the (test data nahi).</p>
+
+<h3>Kaise pakda gaya, aur kaise theek kiya</h3>
+<ol>
+  <li>Routine verification ke dauraan ek row count match nahi hua - turant check kiya, assume nahi kiya ki sab theek hai</li>
+  <li>Confirm hua ki 2 real orders (aur unki fills, history, audit trail) delete ho gaye the</li>
+  <li>Nightly backup se saare 18 rows wapas restore kiye - bilkul same ID, same timestamp, same values ke saath, verify karke</li>
+  <li>Tool ko fix kiya - ab yeh sirf disposable accounts banata hai, aur ek hard safety-check hai jo kabhi bhi real account ko touch hone hi nahi deta</li>
+</ol>
+
+<div class="box warn">
+  <span class="tag">Yeh honestly kyun bataya</span>
+  Galti chhupane se koi fayda nahi - aur is incident ne asal mein yeh bhi prove kiya ki backup system genuinely kaam karta hai, sirf theory mein nahi.
+</div>
+</section>
+
+<!-- SECTION: MISC -->
+<section>
+<div class="pagehead"><span class="eyebrow">06 — Repo Ke Bahar Ke Changes</span></div>
+<h2>Kuch changes jo git mein track nahi hote</h2>
+
+<div class="table-wrap">
+<table>
+<tr><th>Kya</th><th>Kya kiya</th><th>Kyun git mein nahi hai</th></tr>
+<tr><td>Backup ka cron job</td><td>Machine ke crontab mein daily 2am ka schedule add kiya</td><td>System-level setting hai, repo file nahi</td></tr>
+<tr><td><code>strategy-feed/.env</code></td><td>Real secret value ke saath actual config file banayi</td><td>Yeh secret hai - <code>.gitignore</code> isko jaan-boojhkar exclude karta hai</td></tr>
+</table>
+</div>
+
+<div class="footer-note">
+iwmQT Trading Terminal — Technical File-by-File Report — 31 August 2026 — branch <code>feature/dev</code>. Saari file list <code>git diff</code> se verify ki gayi hai.
+</div>
+</section>
+
+</body>
+</html>
