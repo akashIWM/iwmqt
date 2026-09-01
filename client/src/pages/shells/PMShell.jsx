@@ -5,6 +5,8 @@ import TradeBook from '../../components/TradeBook';
 import Watchlist from '../../components/Watchlist';
 import BanScript from '../../components/BanScript';
 import RmsStatsSummary from '../../components/admin/RmsStatsSummary';
+import DeskLimitUtilisation from '../../components/admin/DeskLimitUtilisation';
+import LimitChangeRequestForm from '../../components/admin/LimitChangeRequestForm';
 import { useAuth } from '../../auth/AuthContext';
 import { styles } from './styles';
 import { AccessModule } from './shared';
@@ -26,7 +28,16 @@ export default function PMShell() {
         </div>
       )
     },
-    rms: { label: 'RMS Dashboard (View-Only)', render: () => <RmsStatsSummary /> },
+    rms: {
+      label: 'RMS Dashboard (View-Only)',
+      render: () => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <RmsStatsSummary />
+          <DeskLimitUtilisation />
+          <LimitChangeRequestForm />
+        </div>
+      )
+    },
     watchlist: { label: 'Watchlist', render: () => <Watchlist /> },
     banscript: { label: 'BanScript Alerts', render: () => <BanScript /> }
   };

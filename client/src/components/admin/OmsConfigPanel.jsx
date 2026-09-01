@@ -3,6 +3,8 @@ import { apiFetch } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
+import { useGridColumnPersistence } from '../../hooks/useGridColumnPersistence';
+import { RMS_LIMIT_FIELDS } from '../../constants/rmsLimitFields';
 import { GRID_THEME_CLASS, GRID_THEME_CSS, gridColors } from '../../styles/gridTheme';
 
 ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
@@ -17,21 +19,7 @@ const styles = {
   btn: { padding: '10px 16px', backgroundColor: gridColors.accent, color: '#fff', border: 'none', borderRadius: '4px', fontWeight: '700', cursor: 'pointer', marginTop: '12px' }
 };
 
-// Field key -> {label, control, scope, usedKey}. usedKey points at the matching field in
-// the /oms-config utilisation payload; null means this control is checked per-order, not
-// as a running total, so it has no meaningful "current utilisation" to show.
-const FIELDS = [
-  { key: 'max_order_quantity', label: 'Quantity Limit Check', control: 'Control 2', scope: 'User', usedKey: null },
-  { key: 'max_order_value', label: 'Order Value Check', control: 'Control 3', scope: 'User', usedKey: null },
-  { key: 'price_band_pct', label: 'Price / Trade Price Protection', control: 'Controls 1/4', scope: 'Global', usedKey: null },
-  { key: 'max_open_order_value', label: 'Cumulative Open Order Value', control: 'Control 6', scope: 'User', usedKey: 'max_open_order_value_used' },
-  { key: 'max_position_qty', label: 'Position Limit', control: 'Control 8', scope: 'User', usedKey: 'max_position_qty_used' },
-  { key: 'max_exposure_value', label: 'Exposure Limit (User)', control: 'Control 10', scope: 'User', usedKey: 'max_exposure_value_used' },
-  { key: 'global_exposure_value', label: 'Exposure Limit (Global)', control: 'Control 10', scope: 'Global', usedKey: 'global_exposure_value_used' },
-  { key: 'max_turnover_value', label: 'Trading / Turnover Limit', control: 'Controls 9/11', scope: 'User', usedKey: 'max_turnover_value_used' },
-  { key: 'max_open_orders_count', label: 'Automated Execution Check', control: 'Control 13', scope: 'User', usedKey: 'max_open_orders_count_used' },
-  { key: 'max_orders_per_second', label: 'OPS Cap', control: 'OPS (separate from the 14)', scope: 'Global', usedKey: null }
-];
+const FIELDS = RMS_LIMIT_FIELDS;
 
 const buildRows = (config, utilisation) => FIELDS.map((f) => {
   const limit = Number(config[f.key]);
@@ -48,6 +36,7 @@ export default function OmsConfigPanel() {
   const [config, setConfig] = useState(null);
   const [message, setMessage] = useState('');
   const gridRef = useRef();
+  const columnPersistence = useGridColumnPersistence('grid-columns:oms-config');
 
   async function fetchConfig() {
     try {
@@ -116,6 +105,10 @@ export default function OmsConfigPanel() {
     cellStyle: { fontFamily: '"JetBrains Mono", monospace', fontSize: '12px', display: 'flex', alignItems: 'center' }
   }), []);
 
+  const handleExportCsv = () => {
+    gridRef.current?.api?.exportDataAsCsv({ fileName: `oms-config-${Date.now()}.csv` });
+  };
+
   const onCellValueChanged = (params) => {
     // Recompute pct/status locally so editing a limit updates STATUS immediately, before Save.
     setRows((prev) => prev.map((r) => {
@@ -144,6 +137,12 @@ export default function OmsConfigPanel() {
       )}
       {message && <p style={{ color: gridColors.buy, fontSize: '13px' }}>{message}</p>}
 
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+        <button onClick={handleExportCsv} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '700', backgroundColor: '#e2e8f0', color: gridColors.primary }}>
+          Export CSV
+        </button>
+      </div>
+
       <div className={GRID_THEME_CLASS} style={{ height: '400px', width: '100%' }}>
         <AgGridReact
           ref={gridRef}
@@ -155,6 +154,7 @@ export default function OmsConfigPanel() {
           onCellValueChanged={onCellValueChanged}
           rowHeight={38}
           headerHeight={35}
+          {...columnPersistence}
         />
       </div>
 

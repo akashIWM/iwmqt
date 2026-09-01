@@ -36,7 +36,8 @@ router.get('/', async (req, res) => {
            + COALESCE((SELECT SUM(quantity * price) FROM fills), 0)
         ) AS global_exposure_value_used,
         (SELECT COALESCE(MAX(v), 0) FROM (SELECT SUM(quantity * price) AS v FROM fills GROUP BY user_id) t4) AS max_turnover_value_used,
-        (SELECT COALESCE(MAX(v), 0) FROM (SELECT COUNT(*) AS v FROM orders WHERE status IN ('PENDING', 'PARTIALLY_FILLED') GROUP BY user_id) t5) AS max_open_orders_count_used
+        (SELECT COALESCE(MAX(v), 0) FROM (SELECT COUNT(*) AS v FROM orders WHERE status IN ('PENDING', 'PARTIALLY_FILLED') GROUP BY user_id) t5) AS max_open_orders_count_used,
+        (SELECT COALESCE(SUM(quantity * price), 0) FROM fills) AS global_turnover_value_used
     `);
 
     res.status(200).json({ config: configResult.rows[0], utilisation: utilisationResult.rows[0] });
@@ -51,11 +52,13 @@ const NUMERIC_FIELDS = [
   'max_order_quantity',
   'max_order_value',
   'price_band_pct',
+  'bad_trade_price_pct',
   'max_open_order_value',
   'max_position_qty',
   'max_exposure_value',
   'global_exposure_value',
   'max_turnover_value',
+  'global_turnover_value',
   'max_open_orders_count',
   'max_orders_per_second'
 ];

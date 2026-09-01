@@ -20,8 +20,10 @@ export default function BanScript() {
   const columnPersistence = useGridColumnPersistence('grid-columns:ban-script');
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
-    fetchBannedScripts();
+    // The very first fetch is triggered from onGridReady on the grid below, not here -
+    // syncGridRows() silently no-ops if the grid API isn't attached yet, and a mount-time
+    // fetch can resolve before AG Grid finishes its own init (see OrderBook.jsx for the
+    // full explanation of this race and why it caused "count updates, grid stays empty").
     // Poll every 3 seconds - this is a live risk restriction list, it should stay current.
     const interval = setInterval(fetchBannedScripts, 3000);
     return () => clearInterval(interval);
@@ -47,9 +49,9 @@ export default function BanScript() {
   // Column set per GUI spec 6.2: Script, ASM stage, GSM stage, Alert flag - reason/banned_at
   // kept as bonus context columns since they're real, useful RMS data the spec doesn't ask for.
   const [columnDefs] = useState([
-    { field: 'symbol', headerName: 'SCRIPT', width: 150, cellStyle: { fontWeight: '700', color: gridColors.sell } },
-    { field: 'asm_stage', headerName: 'ASM STAGE', width: 110, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
-    { field: 'gsm_stage', headerName: 'GSM STAGE', width: 110, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
+    { field: 'symbol', headerName: 'SCRIPT', width: 150, pinned: 'left', cellStyle: { fontWeight: '700', color: gridColors.sell } },
+    { field: 'asm_stage', headerName: 'ASM STAGE', width: 110, enableCellChangeFlash: true, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
+    { field: 'gsm_stage', headerName: 'GSM STAGE', width: 110, enableCellChangeFlash: true, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
     {
       headerName: 'ALERT FLAG', width: 100,
       valueGetter: (p) => (p.data.asm_stage || p.data.gsm_stage ? 'YES' : 'NO'),
@@ -100,6 +102,10 @@ export default function BanScript() {
           rowHeight={35}
           headerHeight={35}
           {...columnPersistence}
+          onGridReady={(params) => {
+            columnPersistence.onGridReady(params);
+            fetchBannedScripts();
+          }}
         />
       </div>
     </div>

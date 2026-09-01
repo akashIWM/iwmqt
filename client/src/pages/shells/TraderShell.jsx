@@ -78,8 +78,18 @@ export default function TraderShell() {
     panelContent: {
       padding: '16px',
       flex: 1,
-      overflowY: 'auto'
+      overflowY: 'auto',
+      position: 'relative'
     },
+    // AG Grid sizes its viewport off its container's actual dimensions - a container
+    // collapsed to 0x0 (display:none) can come back blank when made visible again, since
+    // there's no guarantee the grid re-measures and repaints the instant it's shown. Keeping
+    // every panel at its real size at all times (just moved off-screen when inactive) avoids
+    // that class of bug entirely, instead of hiding via display:none.
+    panelSlot: (isActive) => (isActive
+      ? { position: 'relative' }
+      : { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, visibility: 'hidden', pointerEvents: 'none' }
+    ),
     tabRail: {
       width: '60px',
       backgroundColor: '#102a43',
@@ -133,30 +143,38 @@ export default function TraderShell() {
         </div>
 
         <div style={layoutStyles.sidePanel}>
-          {activePanel && (
-            <>
-              <div style={layoutStyles.panelHeader}>
-                {tabs.find(t => t.id === activePanel)?.label}
-                <button style={layoutStyles.closeBtn} onClick={() => setActivePanel(null)}>✕</button>
-              </div>
-              <div style={layoutStyles.panelContent}>
-                {activePanel === 'TradeWindow' && <TradeWindow />}
-                {activePanel === 'OrderWindow' && <OrderBook />}
-                {activePanel === 'TradeBook' && <TradeBook />}
-                {activePanel === 'OpenOrders' && <OpenOrders />}
-                {activePanel === 'NetPositions' && <NetPositions />}
-                {activePanel === 'BanScript' && <BanScript />}
-                {activePanel === 'Strategy' && <StrategyPanel />}
-                {activePanel === 'LogWindow' && <LogWindow />}
+          {/* Header/content are always in the tree (not gated on activePanel) so every panel
+              below mounts the instant the shell loads and starts fetching/polling/listening in
+              the background right away - not just once first clicked. The sidePanel's own
+              width collapses to 0px when nothing is active (see layoutStyles above), so this
+              costs nothing visually while idle. */}
+          <div style={layoutStyles.panelHeader}>
+            {tabs.find(t => t.id === activePanel)?.label}
+            <button style={layoutStyles.closeBtn} onClick={() => setActivePanel(null)}>✕</button>
+          </div>
+          <div style={layoutStyles.panelContent}>
+            {/* Every panel stays mounted for the lifetime of the shell instead of
+                mounting/unmounting per tab click - each one keeps fetching, polling, and
+                listening for pushes in the background, so opening any tab - the first time or
+                the fiftieth - is an instant toggle instead of a fresh REST round trip. Inactive
+                panels are moved off-screen (panelSlot), not display:none'd - AG Grid sizes its
+                viewport off the container's real dimensions, and a container that was ever
+                0x0 isn't guaranteed to repaint the instant it becomes visible again. */}
+            <div style={layoutStyles.panelSlot(activePanel === 'TradeWindow')}><TradeWindow /></div>
+            <div style={layoutStyles.panelSlot(activePanel === 'OrderWindow')}><OrderBook /></div>
+            <div style={layoutStyles.panelSlot(activePanel === 'TradeBook')}><TradeBook /></div>
+            <div style={layoutStyles.panelSlot(activePanel === 'OpenOrders')}><OpenOrders /></div>
+            <div style={layoutStyles.panelSlot(activePanel === 'NetPositions')}><NetPositions /></div>
+            <div style={layoutStyles.panelSlot(activePanel === 'BanScript')}><BanScript /></div>
+            <div style={layoutStyles.panelSlot(activePanel === 'Strategy')}><StrategyPanel /></div>
+            <div style={layoutStyles.panelSlot(activePanel === 'LogWindow')}><LogWindow /></div>
 
-                {!tabs.some((t) => t.id === activePanel) && (
-                  <p style={{ color: '#627d98', fontSize: '14px' }}>
-                    {activePanel} module is coming soon.
-                  </p>
-                )}
-              </div>
-            </>
-          )}
+            {activePanel && !tabs.some((t) => t.id === activePanel) && (
+              <p style={{ color: '#627d98', fontSize: '14px' }}>
+                {activePanel} module is coming soon.
+              </p>
+            )}
+          </div>
         </div>
 
         <div style={layoutStyles.tabRail}>
