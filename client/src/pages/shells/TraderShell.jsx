@@ -14,6 +14,20 @@ import { styles } from './styles';
 export default function TraderShell() {
   const { user, logout } = useAuth();
   const [activePanel, setActivePanel] = useState(null);
+  // Which panels have ever been opened this session - each mounts (and starts its first
+  // fetch) the first time its tab is clicked, not all at once on shell load. Mounting every
+  // panel simultaneously at login fired 6+ REST requests plus multiple WebSocket connections
+  // in the same instant, past the browser's per-origin concurrent-connection cap - later
+  // requests then genuinely queued for seconds behind earlier ones, which looked identical
+  // to a slow backend but wasn't one (confirmed: the same request took ~5ms in isolation).
+  // Staggering first-opens across actual clicks avoids that burst; once opened, a panel
+  // still never unmounts again (see panelSlot below) - re-visiting stays instant.
+  const [openedPanels, setOpenedPanels] = useState(new Set());
+
+  const handleTabClick = (id) => {
+    setActivePanel((current) => (current === id ? null : id));
+    setOpenedPanels((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  };
 
   const tabs = [
     { id: 'TradeWindow', label: 'Trade' },
@@ -143,31 +157,30 @@ export default function TraderShell() {
         </div>
 
         <div style={layoutStyles.sidePanel}>
-          {/* Header/content are always in the tree (not gated on activePanel) so every panel
-              below mounts the instant the shell loads and starts fetching/polling/listening in
-              the background right away - not just once first clicked. The sidePanel's own
-              width collapses to 0px when nothing is active (see layoutStyles above), so this
-              costs nothing visually while idle. */}
+          {/* Header/content are always in the tree (not gated on activePanel) - only which
+              panels below have been opened at least once gates whether they mount. The
+              sidePanel's own width collapses to 0px when nothing is active (see layoutStyles
+              above), so this costs nothing visually while idle. */}
           <div style={layoutStyles.panelHeader}>
             {tabs.find(t => t.id === activePanel)?.label}
             <button style={layoutStyles.closeBtn} onClick={() => setActivePanel(null)}>✕</button>
           </div>
           <div style={layoutStyles.panelContent}>
-            {/* Every panel stays mounted for the lifetime of the shell instead of
-                mounting/unmounting per tab click - each one keeps fetching, polling, and
-                listening for pushes in the background, so opening any tab - the first time or
-                the fiftieth - is an instant toggle instead of a fresh REST round trip. Inactive
-                panels are moved off-screen (panelSlot), not display:none'd - AG Grid sizes its
-                viewport off the container's real dimensions, and a container that was ever
-                0x0 isn't guaranteed to repaint the instant it becomes visible again. */}
-            <div style={layoutStyles.panelSlot(activePanel === 'TradeWindow')}><TradeWindow /></div>
-            <div style={layoutStyles.panelSlot(activePanel === 'OrderWindow')}><OrderBook /></div>
-            <div style={layoutStyles.panelSlot(activePanel === 'TradeBook')}><TradeBook /></div>
-            <div style={layoutStyles.panelSlot(activePanel === 'OpenOrders')}><OpenOrders /></div>
-            <div style={layoutStyles.panelSlot(activePanel === 'NetPositions')}><NetPositions /></div>
-            <div style={layoutStyles.panelSlot(activePanel === 'BanScript')}><BanScript /></div>
-            <div style={layoutStyles.panelSlot(activePanel === 'Strategy')}><StrategyPanel /></div>
-            <div style={layoutStyles.panelSlot(activePanel === 'LogWindow')}><LogWindow /></div>
+            {/* Once a panel has been opened once, it stays mounted for the rest of the
+                session instead of unmounting on every tab switch - each one keeps fetching,
+                polling, and listening for pushes in the background, so re-opening it is an
+                instant toggle instead of a fresh REST round trip. Inactive panels are moved
+                off-screen (panelSlot), not display:none'd - AG Grid sizes its viewport off
+                the container's real dimensions, and a container that was ever 0x0 isn't
+                guaranteed to repaint the instant it becomes visible again. */}
+            {openedPanels.has('TradeWindow') && <div style={layoutStyles.panelSlot(activePanel === 'TradeWindow')}><TradeWindow /></div>}
+            {openedPanels.has('OrderWindow') && <div style={layoutStyles.panelSlot(activePanel === 'OrderWindow')}><OrderBook /></div>}
+            {openedPanels.has('TradeBook') && <div style={layoutStyles.panelSlot(activePanel === 'TradeBook')}><TradeBook /></div>}
+            {openedPanels.has('OpenOrders') && <div style={layoutStyles.panelSlot(activePanel === 'OpenOrders')}><OpenOrders /></div>}
+            {openedPanels.has('NetPositions') && <div style={layoutStyles.panelSlot(activePanel === 'NetPositions')}><NetPositions /></div>}
+            {openedPanels.has('BanScript') && <div style={layoutStyles.panelSlot(activePanel === 'BanScript')}><BanScript /></div>}
+            {openedPanels.has('Strategy') && <div style={layoutStyles.panelSlot(activePanel === 'Strategy')}><StrategyPanel /></div>}
+            {openedPanels.has('LogWindow') && <div style={layoutStyles.panelSlot(activePanel === 'LogWindow')}><LogWindow /></div>}
 
             {activePanel && !tabs.some((t) => t.id === activePanel) && (
               <p style={{ color: '#627d98', fontSize: '14px' }}>
@@ -182,7 +195,7 @@ export default function TraderShell() {
             <button
               key={tab.id}
               style={layoutStyles.tabButton(activePanel === tab.id)}
-              onClick={() => setActivePanel(current => current === tab.id ? null : tab.id)}
+              onClick={() => handleTabClick(tab.id)}
             >
               {tab.label}
             </button>

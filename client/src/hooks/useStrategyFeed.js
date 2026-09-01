@@ -6,9 +6,14 @@ import { WS_BASE_URL } from '../api';
 // folded into that hook so neither file has to change shape for the other's message type.
 let sharedSocket = null;
 let refCount = 0;
+let closeTimer = null;
 const listeners = new Set();
 
 function ensureSocket() {
+  if (closeTimer) {
+    clearTimeout(closeTimer);
+    closeTimer = null;
+  }
   if (sharedSocket) return sharedSocket;
   const ws = new WebSocket(`${WS_BASE_URL}/ws/market-data`);
   ws.onmessage = (event) => {
@@ -26,6 +31,23 @@ function ensureSocket() {
   };
   sharedSocket = ws;
   return ws;
+}
+
+// Deferred, not synchronous - see useOrderUpdates.js's scheduleClose for the full
+// explanation (multiple subscribers mounting in the same tick, plus React StrictMode's
+// mount-cleanup-remount cycle, can both drop refCount to 0 and back to 1+ within one tick).
+function scheduleClose() {
+  if (closeTimer) clearTimeout(closeTimer);
+  closeTimer = setTimeout(() => {
+    closeTimer = null;
+    if (refCount <= 0) {
+      if (sharedSocket) {
+        sharedSocket.close();
+        sharedSocket = null;
+      }
+      refCount = 0;
+    }
+  }, 0);
 }
 
 // Calls onUpdate(update) whenever a strategist/algo feed update arrives from the Python TCP
@@ -46,11 +68,7 @@ export function useStrategyFeed(onUpdate) {
     return () => {
       listeners.delete(listener);
       refCount -= 1;
-      if (refCount <= 0 && sharedSocket) {
-        sharedSocket.close();
-        sharedSocket = null;
-        refCount = 0;
-      }
+      if (refCount <= 0) scheduleClose();
     };
   }, []);
 }
