@@ -22,10 +22,14 @@ export default function OrderBook() {
   const columnPersistence = useGridColumnPersistence('grid-columns:order-book');
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
-    fetchOrders();
-    // Push (below) is the primary update path now; this is a slow fallback net in case a
-    // push is missed (e.g. a brief WS reconnect gap), not the main refresh mechanism anymore.
+    // The very first fetch is deliberately NOT triggered here - it's triggered from
+    // onGridReady on the grid below instead. syncGridRows() (gridSync.js) silently no-ops if
+    // the grid's API isn't attached yet, and a mount-time fetch can resolve before AG Grid
+    // finishes its own internal init - the row count text would update (separate React
+    // state) while the grid itself stayed empty until the next poll, 20s later. Triggering
+    // from onGridReady guarantees the API exists before the first sync ever runs.
+    // Push (below) is the primary update path once loaded; this interval is a slow fallback
+    // net in case a push is missed (e.g. a brief WS reconnect gap), not the main mechanism.
     const interval = setInterval(fetchOrders, 20000);
     return () => clearInterval(interval);
   }, []);
@@ -52,7 +56,7 @@ export default function OrderBook() {
     { field: 'id', headerName: 'INTERNAL ORDER ID', width: 130, valueFormatter: (p) => p.value?.slice(0, 8), cellStyle: { color: gridColors.muted } },
     { field: 'exchange_order_id', headerName: 'EXCHANGE ORDER ID', width: 150, cellStyle: { color: gridColors.muted } },
     { field: 'token', headerName: 'TOKEN', width: 80, cellStyle: { color: gridColors.muted } },
-    { field: 'symbol', headerName: 'SCRIPT', width: 150, cellStyle: { fontWeight: '700', color: gridColors.primary } },
+    { field: 'symbol', headerName: 'SCRIPT', width: 150, pinned: 'left', cellStyle: { fontWeight: '700', color: gridColors.primary } },
     { field: 'expiry', headerName: 'EXPIRY', width: 90, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
     { field: 'type', headerName: 'ORDER TYPE', width: 95, cellStyle: { color: gridColors.primary } },
     {
@@ -62,7 +66,7 @@ export default function OrderBook() {
     { field: 'quantity', headerName: 'QTY', width: 70, enableCellChangeFlash: true, cellStyle: { color: gridColors.primary } },
     { field: 'filled_quantity', headerName: 'FILLED QTY', width: 90, enableCellChangeFlash: true, cellStyle: { color: gridColors.muted } },
     {
-      field: 'side', headerName: 'SIDE', width: 65,
+      field: 'side', headerName: 'SIDE', width: 65, pinned: 'left',
       cellStyle: (p) => ({ color: p.value === 'BUY' ? gridColors.buy : gridColors.sell, fontWeight: '700' })
     },
     { field: 'pan', headerName: 'PAN', width: 100, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
@@ -129,6 +133,10 @@ export default function OrderBook() {
           rowHeight={35}
           headerHeight={35}
           {...columnPersistence}
+          onGridReady={(params) => {
+            columnPersistence.onGridReady(params);
+            fetchOrders();
+          }}
         />
       </div>
     </div>

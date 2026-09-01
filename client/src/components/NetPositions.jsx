@@ -23,8 +23,10 @@ export default function NetPositions() {
   const columnPersistence = useGridColumnPersistence('grid-columns:net-positions');
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
-    fetchPositions();
+    // The very first fetch is triggered from onGridReady on the grid below, not here -
+    // syncGridRows() silently no-ops if the grid API isn't attached yet, and a mount-time
+    // fetch can resolve before AG Grid finishes its own init (see OrderBook.jsx for the
+    // full explanation of this race and why it caused "count updates, grid stays empty").
     // Unlike the other grids, this poll isn't just a fallback net: P&L moves continuously
     // with LTP (via market ticks), not only when an order/fill event fires, so it still
     // needs a real cadence of its own rather than the long fallback interval used elsewhere.
@@ -51,7 +53,7 @@ export default function NetPositions() {
 
   const [columnDefs] = useState([
     { field: 'user_id', headerName: 'OMS / TRADER', width: 110, cellStyle: { color: gridColors.muted } },
-    { field: 'symbol', headerName: 'INSTRUMENT', width: 140, cellStyle: { fontWeight: '700', color: gridColors.primary } },
+    { field: 'symbol', headerName: 'INSTRUMENT', width: 140, pinned: 'left', cellStyle: { fontWeight: '700', color: gridColors.primary } },
     {
       field: 'net_qty', headerName: 'NET QTY', width: 90, enableCellChangeFlash: true,
       cellStyle: (p) => ({ color: Number(p.value) > 0 ? gridColors.buy : gridColors.sell, fontWeight: '700' })
@@ -125,6 +127,10 @@ export default function NetPositions() {
           rowHeight={35}
           headerHeight={35}
           {...columnPersistence}
+          onGridReady={(params) => {
+            columnPersistence.onGridReady(params);
+            fetchPositions();
+          }}
         />
       </div>
     </div>

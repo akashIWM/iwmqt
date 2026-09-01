@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
+import { useGridColumnPersistence } from '../../hooks/useGridColumnPersistence';
 import { GRID_THEME_CLASS, GRID_THEME_CSS, gridColors } from '../../styles/gridTheme';
 
 ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
@@ -39,6 +40,7 @@ export default function UserRoleManagement() {
   const [createError, setCreateError] = useState('');
   const [createResult, setCreateResult] = useState(null);
   const gridRef = useRef();
+  const columnPersistence = useGridColumnPersistence('grid-columns:user-role-management');
 
   const creatableRoles = currentUser.role === 'COMPANY_ACCOUNT' ? COMPANY_ACCOUNT_CREATABLE_ROLES : ALL_ROLES;
 
@@ -191,6 +193,10 @@ export default function UserRoleManagement() {
     cellStyle: { fontFamily: '"JetBrains Mono", monospace', fontSize: '12px', display: 'flex', alignItems: 'center' }
   }), []);
 
+  const handleExportCsv = () => {
+    gridRef.current?.api?.exportDataAsCsv({ fileName: `users-${Date.now()}.csv` });
+  };
+
   return (
     <div>
       <style>{GRID_THEME_CSS}</style>
@@ -215,7 +221,12 @@ export default function UserRoleManagement() {
       </div>
 
       <div style={styles.card}>
-        <p style={styles.text}>Assign roles and lock/unlock accounts for every registered user.</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={styles.text}>Assign roles and lock/unlock accounts for every registered user.</p>
+          <button onClick={handleExportCsv} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '700', backgroundColor: '#e2e8f0', color: gridColors.primary, height: 'fit-content' }}>
+            Export CSV
+          </button>
+        </div>
         {loading ? <p style={styles.text}>Loading user data...</p> : error ? <p style={{ ...styles.text, color: gridColors.sell }}>{error}</p> : (
           <div className={GRID_THEME_CLASS} style={{ height: '400px', width: '100%' }}>
             <AgGridReact
@@ -227,6 +238,7 @@ export default function UserRoleManagement() {
               getRowId={(params) => params.data.id}
               rowHeight={40}
               headerHeight={35}
+              {...columnPersistence}
             />
           </div>
         )}

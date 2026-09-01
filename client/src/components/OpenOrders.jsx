@@ -20,10 +20,12 @@ export default function OpenOrders() {
   const columnPersistence = useGridColumnPersistence('grid-columns:open-orders');
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
-    fetchOpenOrders();
-    // Push (below) is the primary update path now; this is a slow fallback net in case a
-    // push is missed (e.g. a brief WS reconnect gap), not the main refresh mechanism anymore.
+    // The very first fetch is triggered from onGridReady on the grid below, not here -
+    // syncGridRows() silently no-ops if the grid API isn't attached yet, and a mount-time
+    // fetch can resolve before AG Grid finishes its own init (see OrderBook.jsx for the
+    // full explanation of this race and why it caused "count updates, grid stays empty").
+    // Push (below) is the primary update path once loaded; this interval is a slow fallback
+    // net in case a push is missed (e.g. a brief WS reconnect gap), not the main mechanism.
     const interval = setInterval(fetchOpenOrders, 20000);
     return () => clearInterval(interval);
   }, []);
@@ -65,11 +67,11 @@ export default function OpenOrders() {
 
   const [columnDefs] = useState([
     { field: 'id', headerName: 'ORDER ID', width: 100, valueFormatter: (p) => p.value?.slice(0, 8), cellStyle: { color: gridColors.muted } },
-    { field: 'symbol', headerName: 'INSTRUMENT', width: 140, cellStyle: { fontWeight: '700', color: gridColors.primary } },
+    { field: 'symbol', headerName: 'INSTRUMENT', width: 140, pinned: 'left', cellStyle: { fontWeight: '700', color: gridColors.primary } },
     { field: 'token', headerName: 'TOKEN', width: 80, cellStyle: { color: gridColors.muted } },
     { field: 'expiry', headerName: 'EXPIRY', width: 90, valueFormatter: (p) => p.value || '—', cellStyle: { color: gridColors.muted } },
     {
-      field: 'side', headerName: 'SIDE', width: 70,
+      field: 'side', headerName: 'SIDE', width: 70, pinned: 'left',
       cellStyle: (p) => ({ color: p.value === 'BUY' ? gridColors.buy : gridColors.sell, fontWeight: '700' })
     },
     { field: 'quantity', headerName: 'QTY', width: 70, enableCellChangeFlash: true, cellStyle: { color: gridColors.primary } },
@@ -144,6 +146,10 @@ export default function OpenOrders() {
           rowHeight={35}
           headerHeight={35}
           {...columnPersistence}
+          onGridReady={(params) => {
+            columnPersistence.onGridReady(params);
+            fetchOpenOrders();
+          }}
         />
       </div>
     </div>

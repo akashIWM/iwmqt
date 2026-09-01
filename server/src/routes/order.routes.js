@@ -153,23 +153,33 @@ router.post('/place', authenticate, authorize('TRADER'), opsRateLimit, async (re
       max_order_quantity: maxOrderQuantity,
       max_order_value: maxOrderValue,
       price_band_pct: priceBandPct,
+      bad_trade_price_pct: badTradePricePct,
       max_open_order_value: maxOpenOrderValue,
       max_position_qty: maxPositionQty,
       max_exposure_value: maxExposureValue,
       global_exposure_value: globalExposureValue,
       max_turnover_value: maxTurnoverValue,
+      global_turnover_value: globalTurnoverValue,
       max_open_orders_count: maxOpenOrdersCount
     } = omsConfig;
 
-    // Control 1 (Price Check) + Control 4 (Trade Price Protection, linked to Control 1):
-    // reject LIMIT prices too far from the live reference price. Skipped if the symbol
-    // isn't in the mock market universe - there's no reference price to band against.
+    // Control 1 (Price Check): the wide exchange price-band/circuit filter. Skipped if the
+    // symbol isn't in the mock market universe - there's no reference price to band against.
     const ltp = getLtp(normalizedSymbol);
     if (ltp !== null) {
       const band = ltp * (Number(priceBandPct) / 100);
       if (numericPrice < ltp - band || numericPrice > ltp + band) {
-        return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_1_4_PRICE_CHECK',
-          `Order Rejected: Price Check - ${numericPrice} is outside the allowed ${priceBandPct}% band around LTP ${ltp}`);
+        return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_1_PRICE_CHECK',
+          `Order Rejected: Price Check - ${numericPrice} is outside the allowed ${priceBandPct}% exchange price band around LTP ${ltp}`);
+      }
+
+      // Control 4 (Trade Price Protection): a distinct, materially tighter "bad trade price"
+      // guard against fat-finger entries close to LTP - always at least as strict as, and
+      // normally much tighter than, Control 1's wider circuit band above.
+      const tightBand = ltp * (Number(badTradePricePct) / 100);
+      if (numericPrice < ltp - tightBand || numericPrice > ltp + tightBand) {
+        return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_4_TRADE_PRICE_PROTECTION',
+          `Order Rejected: Trade Price Protection - ${numericPrice} is outside the allowed ${badTradePricePct}% bad-trade-price band around LTP ${ltp}`);
       }
     }
 
@@ -256,11 +266,21 @@ router.post('/place', authenticate, authorize('TRADER'), opsRateLimit, async (re
         `Order Rejected: Exposure Limit Check - platform-wide exposure would exceed the global limit of ${globalExposureValue}`);
     }
 
-    // Control 9 / 11 (Trading Limit Check / Turnover Limit Check - same cumulative executed value)
+    // Control 9 (Trading Limit Check) - per-user cumulative executed value.
     const prospectiveTurnover = Number(userTotalsRow.executed_value) + orderValue;
     if (prospectiveTurnover > Number(maxTurnoverValue)) {
-      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_9_11_TURNOVER',
-        `Order Rejected: Turnover Limit Check - cumulative turnover ${prospectiveTurnover.toFixed(2)} exceeds the limit of ${maxTurnoverValue}`);
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_9_TRADING_LIMIT',
+        `Order Rejected: Trading Limit Check - your cumulative turnover ${prospectiveTurnover.toFixed(2)} exceeds the limit of ${maxTurnoverValue}`);
+    }
+
+    // Control 11 (Turnover Limit Check) - a genuinely distinct, platform-wide cap (sum of
+    // every user's executed value, not just this one), the same user-vs-global split
+    // oms_config already has for Control 10 (max_exposure_value / global_exposure_value).
+    const globalTurnoverRow = (await query(`SELECT COALESCE(SUM(quantity * price), 0) AS total_value FROM fills`)).rows[0];
+    const prospectiveGlobalTurnover = Number(globalTurnoverRow.total_value) + orderValue;
+    if (prospectiveGlobalTurnover > Number(globalTurnoverValue)) {
+      return rejectOrder(res, userId, normalizedSymbol, 'CONTROL_11_TURNOVER_LIMIT',
+        `Order Rejected: Turnover Limit Check - platform-wide turnover would exceed the global limit of ${globalTurnoverValue}`);
     }
 
     // Control 12 (Security-Wise Limit Check) - only enforced when RMS has configured a limit for this symbol

@@ -24,10 +24,12 @@ export default function TradeBook() {
   const columnPersistence = useGridColumnPersistence('grid-columns:trade-book');
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability
-    fetchTrades();
-    // Push (below) is the primary update path now; this is a slow fallback net in case a
-    // push is missed (e.g. a brief WS reconnect gap), not the main refresh mechanism anymore.
+    // The very first fetch is triggered from onGridReady on the grid below, not here -
+    // syncGridRows() silently no-ops if the grid API isn't attached yet, and a mount-time
+    // fetch can resolve before AG Grid finishes its own init (see OrderBook.jsx for the
+    // full explanation of this race and why it caused "count updates, grid stays empty").
+    // Push (below) is the primary update path once loaded; this interval is a slow fallback
+    // net in case a push is missed (e.g. a brief WS reconnect gap), not the main mechanism.
     const interval = setInterval(fetchTrades, 20000);
     return () => clearInterval(interval);
   }, []);
@@ -50,14 +52,14 @@ export default function TradeBook() {
 
   const [columnDefs] = useState([
     { field: 'user_id', headerName: 'OMS / TRADER', width: 110, cellStyle: { color: gridColors.muted } },
-    { field: 'symbol', headerName: 'SCRIPT', width: 150, cellStyle: { fontWeight: '700', color: gridColors.primary } },
+    { field: 'symbol', headerName: 'SCRIPT', width: 150, pinned: 'left', cellStyle: { fontWeight: '700', color: gridColors.primary } },
     { field: 'token', headerName: 'TOKEN', width: 80, cellStyle: { color: gridColors.muted } },
     {
-      field: 'side', headerName: 'SIDE', width: 70,
+      field: 'side', headerName: 'SIDE', width: 70, pinned: 'left',
       cellStyle: (p) => ({ color: p.value === 'BUY' ? gridColors.buy : gridColors.sell, fontWeight: '700' })
     },
-    { field: 'quantity', headerName: 'QTY', width: 80, cellStyle: { color: gridColors.primary } },
-    { field: 'price', headerName: 'PRICE', width: 90, valueFormatter: (p) => `₹${Number(p.value).toFixed(2)}`, cellStyle: { color: gridColors.price } },
+    { field: 'quantity', headerName: 'QTY', width: 80, enableCellChangeFlash: true, cellStyle: { color: gridColors.primary } },
+    { field: 'price', headerName: 'PRICE', width: 90, enableCellChangeFlash: true, valueFormatter: (p) => `₹${Number(p.value).toFixed(2)}`, cellStyle: { color: gridColors.price } },
     {
       field: 'created_at', headerName: 'TIME', width: 150,
       valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleString() : '—'), cellStyle: { color: gridColors.muted, fontSize: '11px' }
@@ -116,6 +118,10 @@ export default function TradeBook() {
           rowHeight={35}
           headerHeight={35}
           {...columnPersistence}
+          onGridReady={(params) => {
+            columnPersistence.onGridReady(params);
+            fetchTrades();
+          }}
         />
       </div>
     </div>

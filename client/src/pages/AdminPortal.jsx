@@ -9,6 +9,7 @@ import AuditLogPanel from '../components/admin/AuditLogPanel';
 import CompanyAccountManagement from '../components/admin/CompanyAccountManagement';
 import SecurityLimitsPanel from '../components/admin/SecurityLimitsPanel';
 import ServersPanel from '../components/admin/ServersPanel';
+import LimitRequestsPanel from '../components/admin/LimitRequestsPanel';
 import OrderBook from '../components/OrderBook';
 import TradeBook from '../components/TradeBook';
 import NetPositions from '../components/NetPositions';
@@ -20,6 +21,7 @@ const TABS = [
   { key: 'company-accounts', label: 'Company Account Management', superAdminOnly: true },
   { key: 'users', label: 'User & Role Management' },
   { key: 'oms-config', label: 'RMS Risk Limits (14 Controls)' },
+  { key: 'limit-requests', label: 'PM Limit Requests' },
   { key: 'servers', label: 'Server / OMS Configuration' },
   { key: 'security-limits', label: 'Security-Wise Limits' },
   { key: 'kill-switch', label: 'Kill Switch' },
@@ -44,6 +46,11 @@ const PANELS = {
   'oms-config': () => (
     <div style={{ padding: '20px' }}>
       <OmsConfigPanel />
+    </div>
+  ),
+  'limit-requests': () => (
+    <div style={{ padding: '20px' }}>
+      <LimitRequestsPanel />
     </div>
   ),
   servers: () => (

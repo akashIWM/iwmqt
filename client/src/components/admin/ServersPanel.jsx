@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { apiFetch } from '../../api';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
+import { useGridColumnPersistence } from '../../hooks/useGridColumnPersistence';
 import { GRID_THEME_CLASS, GRID_THEME_CSS, gridColors } from '../../styles/gridTheme';
 
 ModuleRegistry.registerModules([AllCommunityModule, ValidationModule]);
@@ -30,6 +31,7 @@ export default function ServersPanel() {
   const [form, setForm] = useState({ serverId: '', exchange: 'NSE', segment: 'FO', assignedTrader: '', ipPort: '' });
   const [message, setMessage] = useState('');
   const gridRef = useRef();
+  const columnPersistence = useGridColumnPersistence('grid-columns:servers-panel');
 
   useEffect(() => {
     fetchServers();
@@ -136,6 +138,10 @@ export default function ServersPanel() {
     cellStyle: { fontFamily: '"JetBrains Mono", monospace', fontSize: '12px', display: 'flex', alignItems: 'center' }
   }), []);
 
+  const handleExportCsv = () => {
+    gridRef.current?.api?.exportDataAsCsv({ fileName: `servers-${Date.now()}.csv` });
+  };
+
   return (
     <div>
       <style>{GRID_THEME_CSS}</style>
@@ -161,6 +167,11 @@ export default function ServersPanel() {
       </div>
 
       <div style={{ ...styles.card }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+          <button onClick={handleExportCsv} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: '700', backgroundColor: '#e2e8f0', color: gridColors.primary }}>
+            Export CSV
+          </button>
+        </div>
         <div className={GRID_THEME_CLASS} style={{ height: '350px', width: '100%' }}>
           <AgGridReact
             ref={gridRef}
@@ -171,6 +182,7 @@ export default function ServersPanel() {
             getRowId={(params) => params.data.id}
             rowHeight={38}
             headerHeight={35}
+            {...columnPersistence}
           />
         </div>
       </div>
