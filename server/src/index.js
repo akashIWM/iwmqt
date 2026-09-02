@@ -21,6 +21,7 @@ import securityLimitsRoutes from './routes/security-limits.routes.js';
 import serversRoutes from './routes/servers.routes.js';
 import strategyFeedRoutes from './routes/strategyFeed.routes.js';
 import limitRequestsRoutes from './routes/limitRequests.routes.js';
+import algoStrategyRoutes from './routes/algoStrategy.routes.js';
 import { refreshAllRmsCaches } from './services/rmsConfigCache.service.js';
 
 const app = express();
@@ -46,6 +47,7 @@ app.use('/api/security-limits', securityLimitsRoutes);
 app.use('/api/servers', serversRoutes);
 app.use('/api/strategy-feed', strategyFeedRoutes);
 app.use('/api/limit-requests', limitRequestsRoutes);
+app.use('/api/strategies', algoStrategyRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'Platform API is running' });

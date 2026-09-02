@@ -24,10 +24,22 @@ export const getLtp = (symbol) => {
   return instrument ? instrument.ltp : null;
 };
 
+// Full mock instrument list, for UI dropdowns (e.g. the algo strategy leg builder) that need
+// to offer a real, current set of symbols rather than a second, hand-maintained copy of it.
+export const getAllInstruments = () => marketState;
+
 // Contract expiry date for a symbol, same "null if unknown" contract as getLtp.
 export const getExpiry = (symbol) => {
   const instrument = marketState.find((inst) => inst.symbol === symbol);
   return instrument ? instrument.expiry : null;
+};
+
+// Strike/option-type/instrument-family for a symbol - needed to compute a payoff-at-expiry
+// curve (algo strategy builder), same "null if unknown" contract as getLtp.
+export const getInstrumentDetails = (symbol) => {
+  const instrument = marketState.find((inst) => inst.symbol === symbol);
+  if (!instrument) return null;
+  return { instrument: instrument.instrument, optionType: instrument.optionType, strikePrice: instrument.strikePrice };
 };
 
 // NSE-style instrument token for a symbol, same "null if unknown" contract as getLtp.
