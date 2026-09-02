@@ -1,21 +1,47 @@
 import { useCallback, useState } from 'react';
 import { apiFetch } from '../api';
 import { useStrategyFeed } from '../hooks/useStrategyFeed';
+import { gridColors } from '../styles/gridTheme';
+import AlgoStrategyList from './AlgoStrategyList';
 
 const MAX_FEED_ITEMS = 50;
 
+const styles = {
+  container: { fontFamily: '"Inter", sans-serif', color: gridColors.primary, fontSize: '12px' },
+  sectionTitle: { color: gridColors.muted, fontSize: '13px', marginBottom: '8px', marginTop: '24px' },
+  card: { backgroundColor: '#fbfcfe', border: '1px solid #edf2f7', borderRadius: '6px', padding: '12px' },
+  inputGroup: { marginBottom: '14px' },
+  label: { display: 'block', color: gridColors.muted, marginBottom: '6px', fontWeight: '600' },
+  input: { width: '100%', padding: '8px', backgroundColor: '#f8f9fa', border: '1px solid #d9e2ec', borderRadius: '4px', color: gridColors.primary, boxSizing: 'border-box' },
+  btn: { width: '100%', padding: '10px', border: 'none', borderRadius: '4px', fontWeight: '700', cursor: 'pointer', marginTop: '10px' }
+};
+
 export default function StrategyPanel() {
+  return (
+    <div style={styles.container}>
+      {/* The real, functional feature: build and run our own multi-leg strategies, each leg
+          a genuine RMS-checked order (see AlgoStrategyList / AlgoStrategyBuilder). */}
+      <AlgoStrategyList />
+
+      <div style={styles.sectionTitle}>External Algo/Strategist Control</div>
+      <ExternalAlgoControl />
+
+      <div style={styles.sectionTitle}>External Feed - Strategist / Algo Systems</div>
+      <ExternalFeed />
+    </div>
+  );
+}
+
+// Sends a Deploy/Stop command to whichever outside algo/strategist system is connected via
+// the strategy-feed Python TCP listener - distinct from AlgoStrategyList above, which runs
+// strategies inside this platform. This one controls an external process we don't own.
+function ExternalAlgoControl() {
   const [strategyName, setStrategyName] = useState('Nifty_Momentum_Breakout');
   const [lotSize, setLotSize] = useState(50);
   const [stopLoss, setStopLoss] = useState(25);
   const [isRunning, setIsRunning] = useState(false);
-  const [feed, setFeed] = useState([]);
   const [commandStatus, setCommandStatus] = useState(null);
 
-  // Sends the Deploy/Stop action to the backend, which relays it through the strategy-feed
-  // Python listener's control port to whichever external strategist/algo system is connected.
-  // Local isRunning only flips once the command is actually delivered - not optimistically -
-  // so "RUNNING" never lies about a system that never received the command.
   const handleToggleStrategy = async (e) => {
     e.preventDefault();
     const nextRunning = !isRunning;
@@ -47,131 +73,63 @@ export default function StrategyPanel() {
     }
   };
 
-  // Newest first, capped so a chatty external system can't grow this unbounded in memory.
-  const handleFeedUpdate = useCallback((update) => {
-    setFeed((prev) => [update, ...prev].slice(0, MAX_FEED_ITEMS));
-  }, []);
-
-  useStrategyFeed(handleFeedUpdate);
-
-  const styles = {
-    container: { fontFamily: '"Inter", sans-serif', color: '#f8fafc', fontSize: '12px' },
-    inputGroup: { marginBottom: '14px' },
-    label: { display: 'block', color: '#94a3b8', marginBottom: '6px', fontWeight: '600' },
-    input: { width: '100%', padding: '8px', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '4px', color: '#fff', boxSizing: 'border-box' },
-    btn: { width: '100%', padding: '10px', border: 'none', borderRadius: '4px', fontWeight: '700', cursor: 'pointer', marginTop: '10px' }
-  };
-
   return (
-    <div style={styles.container}>
-      <div style={{ padding: '4px 0 16px 0', color: '#627d98', fontSize: '13px' }}>
-        Algo Execution Engine
-      </div>
-
+    <div style={styles.card}>
       <form onSubmit={handleToggleStrategy}>
         <div style={styles.inputGroup}>
           <label style={styles.label}>STRATEGY MODEL</label>
-          <select 
-            value={strategyName} 
-            onChange={(e) => setStrategyName(e.target.value)} 
-            style={styles.input}
-          >
+          <select value={strategyName} onChange={(e) => setStrategyName(e.target.value)} style={styles.input}>
             <option value="Nifty_Momentum_Breakout">Nifty Momentum Breakout</option>
             <option value="BankNifty_VWAP_Cross">BankNifty VWAP Cross</option>
             <option value="Mean_Reversion_Pairs">Mean Reversion Pairs</option>
           </select>
         </div>
-
         <div style={styles.inputGroup}>
           <label style={styles.label}>BASE QUANTITY / LOTS</label>
-          <input 
-            type="number" 
-            value={lotSize} 
-            onChange={(e) => setLotSize(e.target.value)} 
-            style={styles.input} 
-          />
+          <input type="number" value={lotSize} onChange={(e) => setLotSize(e.target.value)} style={styles.input} />
         </div>
-
         <div style={styles.inputGroup}>
           <label style={styles.label}>MAX STOP LOSS (PTS)</label>
-          <input 
-            type="number" 
-            value={stopLoss} 
-            onChange={(e) => setStopLoss(e.target.value)} 
-            style={styles.input} 
-          />
+          <input type="number" value={stopLoss} onChange={(e) => setStopLoss(e.target.value)} style={styles.input} />
         </div>
-
-        <button 
-          type="submit" 
-          style={{ 
-            ...styles.btn, 
-            backgroundColor: isRunning ? '#ef4444' : '#22c55e', 
-            color: '#fff' 
-          }}
-        >
-          {isRunning ? 'STOP ALGO STRATEGY' : 'DEPLOY ALGO STRATEGY'}
+        <button type="submit" style={{ ...styles.btn, backgroundColor: isRunning ? gridColors.sell : gridColors.buy, color: '#fff' }}>
+          {isRunning ? 'STOP EXTERNAL ALGO' : 'DEPLOY EXTERNAL ALGO'}
         </button>
       </form>
-
-      <div style={{ marginTop: '20px', padding: '12px', backgroundColor: '#1e293b', borderRadius: '6px', border: '1px solid #334155' }}>
-        <div style={{ fontWeight: '700', marginBottom: '4px', color: isRunning ? '#4ade80' : '#94a3b8' }}>
-          Status: {isRunning ? 'RUNNING (Listening to Ticks)' : 'IDLE / DISCONNECTED'}
-        </div>
-        <div style={{ fontSize: '11px', color: '#64748b' }}>
-          Executes automated limit entries based on real-time WebSocket tick arrays.
-        </div>
-        {commandStatus && (
-          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px' }}>
-            {commandStatus}
-          </div>
-        )}
+      <div style={{ marginTop: '14px', fontWeight: '700', color: isRunning ? gridColors.buy : gridColors.muted }}>
+        Status: {isRunning ? 'RUNNING' : 'IDLE / DISCONNECTED'}
       </div>
+      {commandStatus && <div style={{ fontSize: '11px', color: gridColors.muted, marginTop: '4px' }}>{commandStatus}</div>}
+    </div>
+  );
+}
 
-      <div style={{ marginTop: '20px' }}>
-        <div style={{ color: '#627d98', fontSize: '13px', marginBottom: '8px' }}>
-          External Feed ({feed.length}) - Strategist / Algo Systems
+function ExternalFeed() {
+  const [feed, setFeed] = useState([]);
+  const handleFeedUpdate = useCallback((update) => {
+    setFeed((prev) => [update, ...prev].slice(0, MAX_FEED_ITEMS));
+  }, []);
+  useStrategyFeed(handleFeedUpdate);
+
+  return (
+    <div style={{ ...styles.card, maxHeight: '260px', overflowY: 'auto' }}>
+      {feed.length === 0 ? (
+        <div style={{ color: gridColors.muted, fontSize: '11px' }}>
+          No updates received yet. Waiting for a connection on the strategy-feed TCP listener.
         </div>
-        <div style={{
-          maxHeight: '260px',
-          overflowY: 'auto',
-          backgroundColor: '#1e293b',
-          border: '1px solid #334155',
-          borderRadius: '6px',
-          padding: feed.length ? '6px' : '12px'
-        }}>
-          {feed.length === 0 ? (
-            <div style={{ color: '#64748b', fontSize: '11px' }}>
-              No updates received yet. Waiting for a connection on the strategy-feed TCP listener.
+      ) : (
+        feed.map((update, i) => (
+          <div key={`${update.received_at}-${i}`} style={{ padding: '8px 0', borderBottom: i === feed.length - 1 ? 'none' : '1px solid #edf2f7', fontSize: '11px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: gridColors.muted }}>
+              <span>{update.source_address}</span>
+              <span>{new Date(update.received_at).toLocaleTimeString()}</span>
             </div>
-          ) : (
-            feed.map((update, i) => (
-              <div
-                key={`${update.received_at}-${i}`}
-                style={{
-                  padding: '8px',
-                  borderBottom: i === feed.length - 1 ? 'none' : '1px solid #334155',
-                  fontSize: '11px'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
-                  <span>{update.source_address}</span>
-                  <span>{new Date(update.received_at).toLocaleTimeString()}</span>
-                </div>
-                <pre style={{
-                  margin: '4px 0 0 0',
-                  color: '#e2e8f0',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  fontFamily: 'monospace'
-                }}>
-                  {JSON.stringify(update.payload, null, 2)}
-                </pre>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+            <pre style={{ margin: '4px 0 0 0', color: gridColors.primary, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'monospace' }}>
+              {JSON.stringify(update.payload, null, 2)}
+            </pre>
+          </div>
+        ))
+      )}
     </div>
   );
 }
