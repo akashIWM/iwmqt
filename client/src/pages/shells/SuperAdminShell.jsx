@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 import { styles } from './styles';
 import { AccessModule } from './shared';
@@ -15,7 +14,7 @@ export default function SuperAdminShell() {
 
   useEffect(() => {
     let active = true;
-    axios.get(`${API_BASE_URL}/admin/users`)
+    axios.get('/admin/users')
       .then((response) => {
         if (active) setUsers(response.data.users);
       })
@@ -33,7 +32,7 @@ export default function SuperAdminShell() {
 
   const handleRoleChange = async (userId, newRole) => {
     try {
-      await axios.put(`${API_BASE_URL}/admin/users/${userId}/role`, { role: newRole });
+      await axios.put(`/admin/users/${userId}/role`, { role: newRole });
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update role');
@@ -43,7 +42,7 @@ export default function SuperAdminShell() {
   const handleStatusToggle = async (userId, currentStatus) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
     try {
-      await axios.put(`${API_BASE_URL}/admin/users/${userId}/status`, { status: newStatus });
+      await axios.put(`/admin/users/${userId}/status`, { status: newStatus });
       setUsers(users.map(u => u.id === userId ? { ...u, status: newStatus } : u));
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update status');

@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { API_BASE_URL } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, ValidationModule } from 'ag-grid-community';
@@ -45,13 +44,12 @@ export default function UserRoleManagement() {
   const creatableRoles = currentUser.role === 'COMPANY_ACCOUNT' ? COMPANY_ACCOUNT_CREATABLE_ROLES : ALL_ROLES;
 
   // useCallback with an empty dependency array: this closes over nothing that changes
-  // (API_BASE_URL is a module-level constant, setUsers/setError/setLoading are the stable
-  // setter functions React guarantees), so a stable reference is both correct and lets the
-  // handlers below - and the columnDefs memo - list it as a dependency without recomputing
-  // on every render.
+  // (setUsers/setError/setLoading are the stable setter functions React guarantees), so a
+  // stable reference is both correct and lets the handlers below - and the columnDefs memo -
+  // list it as a dependency without recomputing on every render.
   const loadUsers = useCallback(() => {
     setLoading(true);
-    axios.get(`${API_BASE_URL}/admin/users`)
+    axios.get('/admin/users')
       .then((response) => setUsers(response.data.users))
       .catch(() => setError('Failed to load user data. Check permissions or network.'))
       .finally(() => setLoading(false));
@@ -67,7 +65,7 @@ export default function UserRoleManagement() {
     setCreateError('');
     setCreateResult(null);
     try {
-      const response = await axios.post(`${API_BASE_URL}/admin/users`, newUser);
+      const response = await axios.post('/admin/users', newUser);
       setCreateResult(response.data);
       setNewUser({ userId: '', fullName: '', email: '', role: creatableRoles[0].value });
       loadUsers();
@@ -84,7 +82,7 @@ export default function UserRoleManagement() {
   // too - satisfies columnDefs' exhaustive-deps honestly instead of suppressing the warning.
   const handleRoleChange = useCallback(async (userId, newRole) => {
     try {
-      await axios.put(`${API_BASE_URL}/admin/users/${userId}/role`, { role: newRole });
+      await axios.put(`/admin/users/${userId}/role`, { role: newRole });
       loadUsers();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update role');
@@ -94,7 +92,7 @@ export default function UserRoleManagement() {
   const handleStatusToggle = useCallback(async (userId, currentStatus) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
     try {
-      await axios.put(`${API_BASE_URL}/admin/users/${userId}/status`, { status: newStatus });
+      await axios.put(`/admin/users/${userId}/status`, { status: newStatus });
       loadUsers();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update status');
@@ -103,7 +101,7 @@ export default function UserRoleManagement() {
 
   const handlePmChange = useCallback(async (userId, pmUserId) => {
     try {
-      await axios.put(`${API_BASE_URL}/admin/users/${userId}/pm`, { pmUserId: pmUserId || null });
+      await axios.put(`/admin/users/${userId}/pm`, { pmUserId: pmUserId || null });
       loadUsers();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update desk assignment');
@@ -113,7 +111,7 @@ export default function UserRoleManagement() {
   const handleForceReset = useCallback(async (userId, displayUserId) => {
     if (!window.confirm(`Force-reset the password for ${displayUserId}? They'll need to set a new one on next login.`)) return;
     try {
-      const response = await axios.post(`${API_BASE_URL}/admin/users/${userId}/reset-password`);
+      const response = await axios.post(`/admin/users/${userId}/reset-password`);
       alert(`New temp password for ${displayUserId}: ${response.data.tempPassword}\n\nShare this securely - it will not be shown again.`);
       loadUsers();
     } catch (err) {

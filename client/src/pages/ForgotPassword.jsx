@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { API_BASE_URL } from '../api';
 import { useNavigate, Link } from 'react-router-dom';
 
 export default function ForgotPassword() {
@@ -26,7 +25,7 @@ export default function ForgotPassword() {
 
     setIsSendingOtp(true);
     try {
-      await axios.post(`${API_BASE_URL}/auth/forgot-password-otp`, { email: formData.email });
+      await axios.post('/auth/forgot-password-otp', { email: formData.email });
       setOtpSent(true);
       setSuccess('Verification code sent! Please check your inbox.');
     } catch (err) {
@@ -45,7 +44,7 @@ export default function ForgotPassword() {
     if (formData.newPassword !== formData.confirmPassword) return setError('Passwords do not match');
 
     try {
-      await axios.post(`${API_BASE_URL}/auth/reset-password`, formData);
+      await axios.post('/auth/reset-password', formData);
       alert('Password reset successfully! You can now log in.');
       navigate('/login');
     } catch (err) {
