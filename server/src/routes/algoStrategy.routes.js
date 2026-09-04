@@ -2,7 +2,7 @@ import express from 'express';
 import { query } from '../db/postgres.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { logAudit } from '../utils/audit.js';
-import { getAllInstruments } from '../services/marketData.service.js';
+import { getAllInstruments, getOptionableUnderlyings, getOptionChain } from '../services/marketData.service.js';
 import { computePayoffCurve, startStrategy, stopStrategy } from '../services/algoStrategy.service.js';
 
 const router = express.Router();
@@ -11,11 +11,27 @@ const router = express.Router();
 // Account/Super Admin cannot deploy trades on a trader's behalf via this route either.
 router.use(authenticate, authorize('TRADER'));
 
-// GET /api/strategies/instruments - the mock instrument list, for the leg builder's
-// Symbol/Strike/Option-type dropdowns. Single source of truth (marketData.service.js), so
-// this can never drift from what Watchlist/TradeWindow already show.
-router.get('/instruments', (req, res) => {
-  res.status(200).json({ instruments: getAllInstruments() });
+// GET /api/strategies/futures - the stock-future instruments (no strike chain, unlike
+// NIFTY/BANKNIFTY), for a leg whose Instrument Type is FUTSTK.
+router.get('/futures', (req, res) => {
+  const futures = getAllInstruments()
+    .filter((inst) => inst.optionType === null)
+    .map((inst) => ({ instrument: inst.instrument, symbol: inst.symbol, expiry: inst.expiry, token: inst.token, ltp: inst.ltp }));
+  res.status(200).json({ futures });
+});
+
+// GET /api/strategies/underlyings - underlyings with a real strike chain (NIFTY, BANKNIFTY),
+// for the builder's top-of-form Instrument dropdown.
+router.get('/underlyings', (req, res) => {
+  res.status(200).json({ underlyings: getOptionableUnderlyings() });
+});
+
+// GET /api/strategies/option-chain?instrument=NIFTY - the full synthetic strike chain for
+// one underlying, for the per-leg Strike dropdown.
+router.get('/option-chain', (req, res) => {
+  const chain = getOptionChain(req.query.instrument);
+  if (!chain) return res.status(404).json({ message: 'No option chain for that instrument' });
+  res.status(200).json(chain);
 });
 
 // POST /api/strategies/payoff-preview - live payoff-at-expiry curve while still building the
@@ -58,7 +74,8 @@ router.post('/', async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id;
     const { name, legs, unhedgedQtyMode, priceExecution, bidMode, allowDuplicates, timeMs,
-      executionMode, priceDepth, orderDepth, allowedBidDepth, allowedSlippage, marketRetries, tickSize, threshold } = req.body;
+      executionMode, priceDepth, orderDepth, allowedBidDepth, allowedSlippage, marketRetries, tickSize, threshold,
+      template, isBidding, allowDelivery, orderTypePreference, tradeGear, shortFlag, qtyPriceOverrides } = req.body;
 
     if (!name || !name.trim()) return res.status(400).json({ message: 'Algorithm name is required' });
     if (!Array.isArray(legs) || legs.length < 2) return res.status(400).json({ message: 'At least 2 legs are required' });
@@ -66,6 +83,9 @@ router.post('/', async (req, res) => {
       if (!leg.symbol || !['BUY', 'SELL'].includes(leg.side) || !(Number(leg.lots) > 0) || !(Number(leg.price) > 0)) {
         return res.status(400).json({ message: 'Every leg needs a symbol, side, positive lots, and positive price' });
       }
+    }
+    if (orderTypePreference && !['LIMIT', 'MARKET'].includes(orderTypePreference)) {
+      return res.status(400).json({ message: 'Order Type must be LIMIT or MARKET' });
     }
     if (!allowDuplicates) {
       const existing = await query(
@@ -80,11 +100,14 @@ router.post('/', async (req, res) => {
     const strategyRes = await query(
       `INSERT INTO algo_strategies
          (user_id, name, unhedged_qty_mode, price_execution, bid_mode, allow_duplicates, time_ms,
-          execution_mode, price_depth, order_depth, allowed_bid_depth, allowed_slippage, market_retries, tick_size, threshold_qty)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+          execution_mode, price_depth, order_depth, allowed_bid_depth, allowed_slippage, market_retries, tick_size, threshold_qty,
+          template, is_bidding, allow_delivery, order_type_preference, trade_gear, short_flag, qty_price_overrides)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
       [userId, name.trim(), unhedgedQtyMode || 'RATIO', priceExecution || 'REVERT_ALL_LEGS', bidMode || 'NORMAL',
         !!allowDuplicates, timeMs || 500, executionMode || 'AGGRESSIVE_SWEEP', priceDepth || 1, orderDepth || 1,
-        allowedBidDepth || 0, allowedSlippage || 0, marketRetries || 0, tickSize || 0.05, threshold || 0]
+        allowedBidDepth || 0, allowedSlippage || 0, marketRetries || 0, tickSize || 0.05, threshold || 0,
+        template || 'CUSTOM', isBidding !== false, !!allowDelivery, orderTypePreference || 'LIMIT',
+        tradeGear || 0, shortFlag || 0, JSON.stringify(qtyPriceOverrides || {})]
     );
     const strategy = strategyRes.rows[0];
 
@@ -92,9 +115,9 @@ router.post('/', async (req, res) => {
     for (let i = 0; i < legs.length; i += 1) {
       const leg = legs[i];
       const legRes = await query(
-        `INSERT INTO algo_strategy_legs (strategy_id, leg_number, symbol, side, lots, price)
-         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-        [strategy.id, i + 1, leg.symbol.trim().toUpperCase(), leg.side, leg.lots, leg.price]
+        `INSERT INTO algo_strategy_legs (strategy_id, leg_number, symbol, side, lots, price, use_live_bid, stm_value)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [strategy.id, i + 1, leg.symbol.trim().toUpperCase(), leg.side, leg.lots, leg.price, !!leg.useLiveBid, leg.stm || 0]
       );
       insertedLegs.push(legRes.rows[0]);
     }

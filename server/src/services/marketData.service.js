@@ -17,11 +17,76 @@ const INITIAL_INSTRUMENTS = [
 let marketState = [...INITIAL_INSTRUMENTS];
 let seq = 0;
 
+// Synthetic strike chain for the algo strategy builder's Instrument+Expiry+Strike leg picker.
+// The mock ticker master above only carries one strike per underlying/option-type (the ATM
+// one) - a real strategy builder needs a full chain either side of it. Generated once at
+// module load from that ATM entry, not merged into marketState: it must never appear on the
+// live Watchlist/market-data WebSocket feed (only the 6 instruments above are meant to), it
+// only needs to be resolvable by symbol for order placement + payoff math.
+const STRIKE_STEP = { NIFTY: 50, BANKNIFTY: 100 };
+const STRIKES_EACH_SIDE = 10;
+
+// Rough, deliberately simple time-value falloff so premiums look plausible further from the
+// ATM strike (an OTM strike costs less than ATM) - this is mock data for a UI dropdown, not
+// a pricing model, so it does not need to be a real options greeks engine.
+const syntheticPremium = (atmPremium, distanceInSteps) => Math.max(0.05, Number((atmPremium * Math.exp(-Math.abs(distanceInSteps) * 0.22)).toFixed(2)));
+
+// Shared across every instrument's chain (not reset per-instrument) - a per-instrument
+// counter based on that instrument's own base token range collided with a *different*
+// instrument's real token (e.g. NIFTY's synthetic strikes landing on 46302, BANKNIFTY PE's
+// real token). Starting well above every real token in INITIAL_INSTRUMENTS and never
+// resetting keeps every synthetic token globally unique.
+let syntheticTokenCounter = 90000;
+
+const buildOptionChain = (instrument) => {
+  const step = STRIKE_STEP[instrument];
+  if (!step) return null;
+  const ceBase = INITIAL_INSTRUMENTS.find((i) => i.instrument === instrument && i.optionType === 'CE');
+  const peBase = INITIAL_INSTRUMENTS.find((i) => i.instrument === instrument && i.optionType === 'PE');
+  if (!ceBase || !peBase) return null;
+
+  const strikes = [];
+  for (let n = -STRIKES_EACH_SIDE; n <= STRIKES_EACH_SIDE; n += 1) {
+    const strike = ceBase.strikePrice + n * step;
+    const isAtm = n === 0;
+    const ce = isAtm ? ceBase : {
+      symbol: `${instrument} ${strike} CE`, instrument, optionType: 'CE', strikePrice: strike,
+      ltp: syntheticPremium(ceBase.ltp, n), token: syntheticTokenCounter++, expiry: ceBase.expiry
+    };
+    const pe = isAtm ? peBase : {
+      symbol: `${instrument} ${strike} PE`, instrument, optionType: 'PE', strikePrice: strike,
+      ltp: syntheticPremium(peBase.ltp, n), token: syntheticTokenCounter++, expiry: peBase.expiry
+    };
+    strikes.push({ strike, ce, pe });
+  }
+  return { instrument, expiry: ceBase.expiry, step, strikes };
+};
+
+const OPTION_CHAINS = Object.fromEntries(
+  Object.keys(STRIKE_STEP).map((instrument) => [instrument, buildOptionChain(instrument)])
+);
+
+// All synthetic chain entries flattened, for symbol lookups (getLtp/getInstrumentDetails/getToken).
+const chainEntryBySymbol = new Map();
+Object.values(OPTION_CHAINS).forEach((chain) => {
+  chain.strikes.forEach(({ ce, pe }) => {
+    chainEntryBySymbol.set(ce.symbol, ce);
+    chainEntryBySymbol.set(pe.symbol, pe);
+  });
+});
+
+// Underlyings with a strike chain available, for the strategy builder's Instrument dropdown.
+export const getOptionableUnderlyings = () => Object.values(OPTION_CHAINS).map((c) => ({ instrument: c.instrument, expiry: c.expiry }));
+
+// One instrument's full strike chain, for the strategy builder's Strike dropdown per leg.
+export const getOptionChain = (instrument) => OPTION_CHAINS[instrument] || null;
+
 // Reference price for pre-trade band checks (order.routes.js). Returns null if the
 // symbol isn't in the mock market universe - callers should skip the check in that case.
 export const getLtp = (symbol) => {
   const instrument = marketState.find((inst) => inst.symbol === symbol);
-  return instrument ? instrument.ltp : null;
+  if (instrument) return instrument.ltp;
+  return chainEntryBySymbol.get(symbol)?.ltp ?? null;
 };
 
 // Full mock instrument list, for UI dropdowns (e.g. the algo strategy leg builder) that need
@@ -31,12 +96,15 @@ export const getAllInstruments = () => marketState;
 // Contract expiry date for a symbol, same "null if unknown" contract as getLtp.
 export const getExpiry = (symbol) => {
   const instrument = marketState.find((inst) => inst.symbol === symbol);
-  return instrument ? instrument.expiry : null;
+  if (instrument) return instrument.expiry;
+  return chainEntryBySymbol.get(symbol)?.expiry ?? null;
 };
 
 // Strike/option-type/instrument-family for a symbol - needed to compute a payoff-at-expiry
 // curve (algo strategy builder), same "null if unknown" contract as getLtp.
 export const getInstrumentDetails = (symbol) => {
+  const chainEntry = chainEntryBySymbol.get(symbol);
+  if (chainEntry) return { instrument: chainEntry.instrument, optionType: chainEntry.optionType, strikePrice: chainEntry.strikePrice };
   const instrument = marketState.find((inst) => inst.symbol === symbol);
   if (!instrument) return null;
   return { instrument: instrument.instrument, optionType: instrument.optionType, strikePrice: instrument.strikePrice };
@@ -45,7 +113,8 @@ export const getInstrumentDetails = (symbol) => {
 // NSE-style instrument token for a symbol, same "null if unknown" contract as getLtp.
 export const getToken = (symbol) => {
   const instrument = marketState.find((inst) => inst.symbol === symbol);
-  return instrument ? instrument.token : null;
+  if (instrument) return instrument.token;
+  return chainEntryBySymbol.get(symbol)?.token ?? null;
 };
 
 const tickInstrument = (inst) => {
